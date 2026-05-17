@@ -1,4 +1,4 @@
-# StockGrab.lk — Sri Lanka's Stock Media Downloader
+# StockMart.lk — Sri Lanka's Stock Media Downloader
 
 Download from Shutterstock, Freepik, Adobe Stock, Envato Elements & 20+ providers. Pay in LKR.
 
@@ -16,7 +16,7 @@ Download from Shutterstock, Freepik, Adobe Stock, Envato Elements & 20+ provider
 
 | Variable | Value |
 |----------|-------|
-| `REACT_APP_API_URL` | Your Railway backend URL (e.g. `https://stockgrab-backend.up.railway.app`) |
+| `REACT_APP_API_URL` | Your Railway backend URL (e.g. `https://stockmart-backend.up.railway.app`) |
 
 ### Backend → Railway
 

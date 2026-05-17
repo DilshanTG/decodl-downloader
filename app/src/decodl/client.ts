@@ -12,10 +12,10 @@ export function scrubDecodlBrand(message: string): string {
   if (!message) return message;
   
   return message
-    .replace(/@decodl_support/gi, '@stockgrab_support')
-    .replace(/decodl\.net/gi, 'stockgrab.lk')
-    .replace(/decodl\.ir/gi, 'stockgrab.lk')
-    .replace(/decodl/gi, 'StockGrab')
+    .replace(/@decodl_support/gi, '@stockmart_support')
+    .replace(/decodl\.net/gi, 'stockmart.lk')
+    .replace(/decodl\.ir/gi, 'stockmart.lk')
+    .replace(/decodl/gi, 'StockMart')
     .replace(/09399417568/gi, 'our support team')
     .replace(/telegram number/gi, 'telegram channel')
     .replace(/telegram/gi, 'support channels');
@@ -39,10 +39,10 @@ export interface DecodlStatusResult {
 }
 
 const ERROR_MAPPINGS: Record<string, string> = {
-  'no-package': 'Your StockGrab API account does not have an active package for this provider. Please purchase a Stock package directly on your dashboard (LKR balance must be converted to package stock).',
+  'no-package': 'Your StockMart API account does not have an active package for this provider. Please purchase a Stock package directly on your dashboard (LKR balance must be converted to package stock).',
   'no-provider': 'The requested stock provider is temporarily experiencing server issues. Please try again later.',
   'not-found': 'The requested asset could not be found. Please check that the URL or code is correct and active on the provider site.',
-  'not-supported': 'This specific asset or media type is not supported by StockGrab at this time.',
+  'not-supported': 'This specific asset or media type is not supported by StockMart at this time.',
   'error': 'The provider download system is currently unable to purchase this asset. Please try again in 5-10 minutes.'
 };
 

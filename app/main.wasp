@@ -1,9 +1,9 @@
-app stockgrab {
+app stockmart {
   wasp: {
     version: "^0.22.0"
   },
 
-  title: "StockGrab.lk - Sri Lanka's Premium Stock Media Downloader",
+  title: "StockMart.lk - Sri Lanka's Premium Stock Media Downloader",
 
   head: [
     "<link rel='icon' href='/favicon.ico' />",
@@ -11,9 +11,9 @@ app stockgrab {
     "<meta name='author' content='DigiMart Solutions (Pvt) Ltd' />",
     "<meta name='keywords' content='stock photos, shutterstock, freepik, adobe stock, envato elements, download, sri lanka, lkr' />",
     "<meta property='og:type' content='website' />",
-    "<meta property='og:title' content='StockGrab.lk - Sri Lanka Stock Media Downloader' />",
-    "<meta property='og:site_name' content='StockGrab.lk' />",
-    "<meta property='og:url' content='https://stockgrab.lk' />",
+    "<meta property='og:title' content='StockMart.lk - Sri Lanka Stock Media Downloader' />",
+    "<meta property='og:site_name' content='StockMart.lk' />",
+    "<meta property='og:url' content='https://stockmart.lk' />",
     "<meta property='og:description' content='Download premium stock media and pay in LKR. Shutterstock, Freepik, Adobe Stock and more.' />",
   ],
 
@@ -22,8 +22,8 @@ app stockgrab {
     methods: {
       email: {
         fromField: {
-          name: "StockGrab.lk",
-          email: "noreply@stockgrab.lk"
+          name: "StockMart.lk",
+          email: "noreply@stockmart.lk"
         },
         emailVerification: {
           clientRoute: EmailVerificationRoute,
@@ -57,8 +57,8 @@ app stockgrab {
   emailSender: {
     provider: SendGrid,
     defaultFrom: {
-      name: "StockGrab.lk",
-      email: "noreply@stockgrab.lk"
+      name: "StockMart.lk",
+      email: "noreply@stockmart.lk"
     },
   },
 }

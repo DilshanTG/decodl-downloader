@@ -73,7 +73,7 @@ export const testimonials = [
     role: "Freelance Creative Designer",
     avatarSrc: daBoiAvatar,
     socialUrl: "",
-    quote: "StockGrab has been an absolute game-changer. I no longer have to pay high USD markup rates or worry about credit card blocks. I just buy credits in LKR and get my vectors instantly.",
+    quote: "StockMart has been an absolute game-changer. I no longer have to pay high USD markup rates or worry about credit card blocks. I just buy credits in LKR and get my vectors instantly.",
   },
   {
     name: "Dilini Senanayake",
@@ -94,8 +94,8 @@ export const testimonials = [
 export const faqs = [
   {
     id: 1,
-    question: "What is StockGrab.lk?",
-    answer: "StockGrab.lk is a credit-based utility designed for Sri Lankan designers and agencies. It allows you to purchase credits in local currency (LKR) and use them to instantly download premium assets from 20+ global stock sites without a credit card or USD conversion fees.",
+    question: "What is StockMart.lk?",
+    answer: "StockMart.lk is a credit-based utility designed for Sri Lankan designers and agencies. It allows you to purchase credits in local currency (LKR) and use them to instantly download premium assets from 20+ global stock sites without a credit card or USD conversion fees.",
   },
   {
     id: 2,
@@ -105,7 +105,7 @@ export const faqs = [
   {
     id: 3,
     question: "Do my credits expire?",
-    answer: "No! All credit packages purchased on StockGrab have lifetime validity. They will never expire, allowing you to use them at your own pace.",
+    answer: "No! All credit packages purchased on StockMart have lifetime validity. They will never expire, allowing you to use them at your own pace.",
   },
   {
     id: 4,

@@ -334,7 +334,7 @@ export default function DashboardPage() {
       refetchBalance();
       toast({
         title: "2 free credits claimed!",
-        description: "Welcome to StockGrab. Enjoy your free downloads.",
+        description: "Welcome to StockMart. Enjoy your free downloads.",
       });
     } catch (err: any) {
       toast({
