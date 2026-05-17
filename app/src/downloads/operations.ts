@@ -68,16 +68,20 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   })
   if (!pricing) throw new HttpError(404, `Provider "${resolvedSlug}" (${resolvedVariant}) not found or inactive.`)
 
-  const creditCost = pricing.creditCost
+  // Credit cost = max(our DB price, Decodl's actual cost for this asset).
+  // We call Decodl /info to get their real cost so the charge matches what the user saw in the preview.
+  // Falls back to our DB price if Decodl /info is unavailable (fail-safe).
+  let creditCost = pricing.creditCost
+  try {
+    const assetInfo = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
+    creditCost = parseFloat(Math.max(pricing.creditCost, assetInfo.ratio).toFixed(2))
+  } catch {
+    // Decodl /info failed — fall back to our DB price, which is always safe to charge
+  }
 
   // 3. Check user balance and concurrent cap
   const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
   if (!user) throw new HttpError(404)
-
-  const available = user.credits - user.reservedCredits
-  if (available < creditCost) {
-    throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
-  }
 
   const MAX_CONCURRENT = 5
   const activeCount = await context.entities.Download.count({
@@ -87,11 +91,23 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
     throw new HttpError(429, `You already have ${activeCount} downloads in progress. Wait for them to finish before submitting more.`)
   }
 
-  // 4. RESERVE credits (do NOT deduct yet).
+  // 4. ATOMIC credit reserve — prevents double-submit race condition.
+  //    updateMany WHERE clause is evaluated atomically at the DB level.
+  //    Two simultaneous requests cannot both succeed: the first increments reservedCredits,
+  //    causing the second's WHERE check (reservedCredits <= credits - cost) to fail.
   //    credits stays unchanged — only reservedCredits increases.
-  //    Available balance = credits - reservedCredits.
-  //    Credits are only permanently deducted when the download is confirmed complete.
-  //    On failure: reservedCredits decreases back to 0, credits untouched = full refund guaranteed.
+  const reserved = await context.entities.User.updateMany({
+    where: {
+      id: user.id,
+      reservedCredits: { lte: user.credits - creditCost }, // atomic: credits - reservedCredits >= creditCost
+    },
+    data: { reservedCredits: { increment: creditCost } },
+  })
+  if (reserved.count === 0) {
+    const available = user.credits - user.reservedCredits
+    throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
+  }
+
   const availableAfterReserve = user.credits - user.reservedCredits - creditCost
 
   const [download] = await Promise.all([
@@ -108,10 +124,6 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
         errorMessage: null,
         lastPolledAt: null,
       },
-    }),
-    context.entities.User.update({
-      where: { id: user.id },
-      data: { reservedCredits: { increment: creditCost } },
     }),
     context.entities.CreditTransaction.create({
       data: {
@@ -144,14 +156,21 @@ export const retryFailedDownload: RetryFailedDownload<{ id: string }, any> = asy
   const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
   if (!user) throw new HttpError(404)
 
-  const available = user.credits - user.reservedCredits
-  if (available < download.creditsCharged) {
+  // Atomic reserve — same race-condition-proof pattern as submitDownload
+  const reserved = await context.entities.User.updateMany({
+    where: {
+      id: user.id,
+      reservedCredits: { lte: user.credits - download.creditsCharged },
+    },
+    data: { reservedCredits: { increment: download.creditsCharged } },
+  })
+  if (reserved.count === 0) {
+    const available = user.credits - user.reservedCredits
     throw new HttpError(402, `Insufficient credits. You need ${download.creditsCharged} credits but have ${available.toFixed(1)} available.`)
   }
 
-  const availableAfterReserve = available - download.creditsCharged
+  const availableAfterReserve = user.credits - user.reservedCredits - download.creditsCharged
 
-  // Reserve credits for the retry — same pattern as initial submit
   await Promise.all([
     context.entities.Download.update({
       where: { id },
@@ -162,10 +181,6 @@ export const retryFailedDownload: RetryFailedDownload<{ id: string }, any> = asy
         errorMessage: null,
         lastPolledAt: null,
       },
-    }),
-    context.entities.User.update({
-      where: { id: user.id },
-      data: { reservedCredits: { increment: download.creditsCharged } },
     }),
     context.entities.CreditTransaction.create({
       data: {
@@ -190,11 +205,23 @@ type GetAssetInfoInput = {
   options?: Array<{ name: string; value: string }>
 }
 
+// Rate limiter: max 30 preview requests per user per minute (prevents Decodl quota exhaustion)
+const assetInfoCalls = new Map<string, number[]>()
+const ASSET_INFO_MAX_PER_MIN = 30
+
 export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
   { link, code, providerSlug, options = [] },
   context
 ) => {
   if (!context.user) throw new HttpError(401)
+
+  const now = Date.now()
+  const key = context.user.id
+  const recent = (assetInfoCalls.get(key) || []).filter(t => now - t < 60_000)
+  if (recent.length >= ASSET_INFO_MAX_PER_MIN) {
+    throw new HttpError(429, 'Too many preview requests. Please wait a moment before trying again.')
+  }
+  assetInfoCalls.set(key, [...recent, now])
 
   let resolvedSlug = providerSlug
   if (!resolvedSlug && link) resolvedSlug = detectProviderFromUrl(link) || undefined
@@ -207,13 +234,18 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
       where: { slug: resolvedSlug, isActive: true },
     })
 
-    const baseCost = pricing ? pricing.creditCost : 1.0
-    const calculatedCost = baseCost * info.ratio
+    const ourCost    = pricing ? pricing.creditCost : 1.0
+    const decodlCost = info.ratio  // Decodl's actual credit cost for this asset (not a multiplier)
+
+    // Show our price unless Decodl charges more — in that case pass the higher cost to the user.
+    // If decodlCost < ourCost we already profit at ourCost, so show ourCost.
+    // If decodlCost > ourCost Decodl costs us more than we planned, so show decodlCost.
+    const displayCost = parseFloat(Math.max(ourCost, decodlCost).toFixed(2))
 
     return {
       providerSlug: resolvedSlug,
       ratio: info.ratio,
-      calculatedCost: Math.max(0.1, parseFloat(calculatedCost.toFixed(2))),
+      calculatedCost: displayCost,
       options: info.options || [],
     }
   } catch (err: any) {

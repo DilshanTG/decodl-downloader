@@ -25,6 +25,11 @@ const MIME_MAP: Record<string, string> = {
 };
 
 export const downloadFile = async (req: Request, res: Response, context: any) => {
+  // Auth check — only the file owner (or admin) may download
+  if (!context.user) {
+    return res.status(401).send('Unauthorized.');
+  }
+
   const id = req.params.id;
 
   // Ultimate Guard 1: Input Validation
@@ -57,6 +62,11 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
       return res.status(404).send('Download not found.');
     }
 
+    // Ownership check — users may only download their own files
+    if (download.userId !== context.user.id && !context.user.isAdmin) {
+      return res.status(403).send('Forbidden.');
+    }
+
     if (download.status !== 'completed' || !download.downloadUrl) {
       return res.status(400).send('This download is not completed yet.');
     }
@@ -64,6 +74,16 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
     // 2. Check for link expiration (24h)
     if (download.expiresAt && new Date(download.expiresAt) < new Date()) {
       return res.status(410).send('This download link has expired.');
+    }
+
+    // SSRF protection — only allow https URLs from trusted upstream
+    try {
+      const parsed = new URL(download.downloadUrl)
+      if (parsed.protocol !== 'https:') {
+        return res.status(400).send('Invalid download source.')
+      }
+    } catch {
+      return res.status(400).send('Invalid download URL.')
     }
 
     // Ultimate Guard 2: Stream Connect Timeout Protection

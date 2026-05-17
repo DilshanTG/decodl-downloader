@@ -4,10 +4,12 @@ import { HttpError } from 'wasp/server'
 const DIGIMART_BASE = 'https://pay.digimartsolutions.lk'
 
 const PACKAGES = {
-  starter:  { credits: 10,  amountLKR: 1000,  name: 'Starter' },
-  pro:      { credits: 50,  amountLKR: 4500,  name: 'Pro' },
-  business: { credits: 200, amountLKR: 16000, name: 'Business' },
-  agency:   { credits: 500, amountLKR: 35000, name: 'Agency' },
+  single:   { credits: 1,    amountLKR: 200,    name: 'Single'   },
+  starter:  { credits: 10,   amountLKR: 1800,   name: 'Starter'  },
+  value:    { credits: 50,   amountLKR: 8500,   name: 'Value'    },
+  pro:      { credits: 100,  amountLKR: 16000,  name: 'Pro'      },
+  business: { credits: 500,  amountLKR: 75000,  name: 'Business' },
+  agency:   { credits: 1000, amountLKR: 140000, name: 'Agency'   },
 } as const
 
 type PackageId = keyof typeof PACKAGES
@@ -23,6 +25,17 @@ export const createPayherePayment: CreatePayherePayment<
 
   const pkg = PACKAGES[packageId]
   if (!pkg) throw new HttpError(400, 'Invalid package')
+
+  // Dedup: prevent double payment from rapid re-clicks (5-min window per user+package)
+  const recentPending = await context.entities.Payment.findFirst({
+    where: {
+      userId: context.user.id,
+      packageId,
+      status: 'pending',
+      createdAt: { gt: new Date(Date.now() - 5 * 60 * 1000) },
+    },
+  })
+  if (recentPending) throw new HttpError(429, 'A payment for this package is already in progress. Please complete or wait for it to expire.')
 
   const merchantKey = process.env.PAYHERE_MERCHANT_KEY!
   const clientOrderId = `SG-${Date.now()}-${context.user.id.slice(0, 8)}`
