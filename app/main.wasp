@@ -204,6 +204,24 @@ api downloadFile {
 
 
 // ─── Background Jobs ──────────────────────────────────────────────────────────
+
+// On-demand job: submitted by submitDownload/retryFailedDownload actions.
+// teamSize: 5 → PgBoss runs max 5 concurrent Decodl submission workers globally.
+// This is the rate-limiter that protects Decodl from 500-user spikes.
+job processDecodlSubmission {
+  executor: PgBoss,
+  perform: {
+    fn: import { processDecodlSubmission } from "@src/downloads/jobs",
+    executorOptions: {
+      pgBoss: {=json { "retryLimit": 2, "retryDelay": 10, "expireInSeconds": 300 } json=}
+    }
+  },
+  entities: [User, Download, CreditTransaction]
+}
+
+// Scheduled: polls all "processing" downloads every minute.
+// PgBoss guarantees only ONE instance runs at a time across all server machines.
+// The old in-memory isPolling flag has been removed — PgBoss handles this natively.
 job pollDecodlJobs {
   executor: PgBoss,
   perform: {
@@ -244,6 +262,46 @@ job dailyStatsJob {
 }
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
+query adminGetOverviewStats {
+  fn: import { adminGetOverviewStats } from "@src/admin/operations",
+  entities: [User, Download, Payment, CreditTransaction, ProviderPricing]
+}
+
+query adminGetAllDownloads {
+  fn: import { adminGetAllDownloads } from "@src/admin/operations",
+  entities: [Download, User]
+}
+
+query adminGetAllPayments {
+  fn: import { adminGetAllPayments } from "@src/admin/operations",
+  entities: [Payment, User]
+}
+
+query adminGetProviderStats {
+  fn: import { adminGetProviderStats } from "@src/admin/operations",
+  entities: [ProviderPricing, Download]
+}
+
+query adminGetAllCreditTransactions {
+  fn: import { adminGetAllCreditTransactions } from "@src/admin/operations",
+  entities: [CreditTransaction, User]
+}
+
+action adminAdjustUserCredits {
+  fn: import { adminAdjustUserCredits } from "@src/admin/operations",
+  entities: [User, CreditTransaction]
+}
+
+action adminUpdateProviderPricing {
+  fn: import { adminUpdateProviderPricing } from "@src/admin/operations",
+  entities: [ProviderPricing]
+}
+
+action adminForceRetryDownload {
+  fn: import { adminForceRetryDownload } from "@src/admin/operations",
+  entities: [Download]
+}
+
 route AdminRoute { path: "/admin", to: AnalyticsDashboardPage }
 page AnalyticsDashboardPage {
   authRequired: true,
@@ -256,28 +314,34 @@ page AdminUsersPage {
   component: import AdminUsers from "@src/admin/dashboards/users/UsersDashboardPage"
 }
 
+route AdminDownloadsRoute { path: "/admin/downloads", to: AdminDownloadsPage }
+page AdminDownloadsPage {
+  authRequired: true,
+  component: import AdminDownloadsPage from "@src/admin/dashboards/downloads/AdminDownloadsPage"
+}
+
+route AdminPaymentsRoute { path: "/admin/payments", to: AdminPaymentsPage }
+page AdminPaymentsPage {
+  authRequired: true,
+  component: import AdminPaymentsPage from "@src/admin/dashboards/payments/AdminPaymentsPage"
+}
+
+route AdminProvidersRoute { path: "/admin/providers", to: AdminProvidersPage }
+page AdminProvidersPage {
+  authRequired: true,
+  component: import AdminProvidersPage from "@src/admin/dashboards/providers/AdminProvidersPage"
+}
+
+route AdminCreditsRoute { path: "/admin/credits", to: AdminCreditsPage }
+page AdminCreditsPage {
+  authRequired: true,
+  component: import AdminCreditsPage from "@src/admin/dashboards/credits/AdminCreditsPage"
+}
+
 route AdminSettingsRoute { path: "/admin/settings", to: AdminSettingsPage }
 page AdminSettingsPage {
   authRequired: true,
   component: import AdminSettings from "@src/admin/elements/settings/SettingsPage"
-}
-
-route AdminCalendarRoute { path: "/admin/calendar", to: AdminCalendarPage }
-page AdminCalendarPage {
-  authRequired: true,
-  component: import AdminCalendar from "@src/admin/elements/calendar/CalendarPage"
-}
-
-route AdminUIButtonsRoute { path: "/admin/ui/buttons", to: AdminUIButtonsPage }
-page AdminUIButtonsPage {
-  authRequired: true,
-  component: import AdminUI from "@src/admin/elements/ui-elements/ButtonsPage"
-}
-
-route AdminMessagesRoute { path: "/admin/messages", to: AdminMessagesPage }
-page AdminMessagesPage {
-  authRequired: true,
-  component: import AdminMessages from "@src/admin/dashboards/messages/MessagesPage"
 }
 
 route NotFoundRoute { path: "*", to: NotFoundPage }
