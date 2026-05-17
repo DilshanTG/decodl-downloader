@@ -1,0 +1,11 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd app && npm install -g @wasp.sh/wasp-cli@0.22.0 && wasp build && cd .wasp/out/server && npm install"
+
+[deploy]
+startCommand = "cd app/.wasp/out/server && node bundle/server.js"
+healthcheckPath = "/health"
+
+[variables]
+PORT = "8080"
+NODE_ENV = "production"

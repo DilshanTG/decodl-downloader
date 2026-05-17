@@ -17,8 +17,13 @@ const decodlEnvSchema = z.object({
   DECODL_TOKEN: z.string().min(1),
 })
 
+const sendgridEnvSchema = z.object({
+  SENDGRID_API_KEY: z.string().optional(),
+})
+
 export const serverEnvValidationSchema = defineEnvValidationSchema(
   authEnvSchema
     .merge(payhereEnvSchema)
     .merge(decodlEnvSchema)
+    .merge(sendgridEnvSchema)
 )

@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm install -g @wasp.sh/wasp-cli@0.22.0 && cd app && wasp build",
+  "outputDirectory": "app/.wasp/out/web-app/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}

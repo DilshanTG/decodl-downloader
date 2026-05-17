@@ -55,7 +55,7 @@ app stockgrab {
   },
 
   emailSender: {
-    provider: Dummy,
+    provider: SendGrid,
     defaultFrom: {
       name: "StockGrab.lk",
       email: "noreply@stockgrab.lk"
