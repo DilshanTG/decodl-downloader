@@ -16,6 +16,7 @@ model User {
   isAdmin                Boolean              @default(false)
 
   credits                Float                @default(0)
+  reservedCredits        Float                @default(0)  // locked in active downloads — never deducted unless download succeeds
   lifetimeCreditsEarned  Float                @default(0)
   lifetimeCreditsSpent   Float                @default(0)
   lifetimeSpentLKR       Int                  @default(0)

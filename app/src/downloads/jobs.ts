@@ -142,19 +142,16 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
       const result = await checkDecodlJobStatus(download.decodlJobId!)
 
       if (result.status === 'completed' && result.downloadUrl) {
-        await context.entities.Download.update({
-          where: { id: download.id },
-          data: {
-            status: 'completed',
-            downloadUrl: result.downloadUrl,
-            fileName: result.fileName || null,
-            fileSize: result.fileSize || null,
-            thumbnailUrl: result.thumbnailUrl || null,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-            lastPolledAt: new Date(),
-          },
+        // Confirm the charge: ONLY NOW do we permanently deduct credits.
+        // credits -= cost, reservedCredits -= cost → net change to visible balance = 0
+        // (visible balance = credits - reservedCredits, which stayed the same since submit)
+        await confirmDownloadCharge(download, context, {
+          downloadUrl: result.downloadUrl,
+          fileName: result.fileName || null,
+          fileSize: result.fileSize || null,
+          thumbnailUrl: result.thumbnailUrl || null,
         })
-        console.log(`[Poll] Download ${download.id} completed.`)
+        console.log(`[Poll] Download ${download.id} completed — ${download.creditsCharged} credits confirmed.`)
 
       } else if (result.status === 'failed') {
         await handleDownloadFailure(download, context, result.errorMessage || 'Download failed')
@@ -196,46 +193,104 @@ export const expireOldDownloads = async (_args: unknown, context: any) => {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared helper: fail a download and refund its credits atomically
+// confirmDownloadCharge — called ONLY when Decodl confirms the file is ready.
+//
+// This is the ONLY place where credits are permanently deducted.
+// Atomically: credits -= cost, reservedCredits -= cost, download = completed.
+// Net effect on visible balance (credits - reservedCredits) = zero, because
+// the reservation already reduced the visible balance at submit time.
+// lifetimeCreditsSpent only increments here — on confirmed success.
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleDownloadFailure(download: any, context: any, errorMessage: string) {
-  // Only refund if credits were actually charged (creditsCharged > 0)
-  if (download.creditsCharged <= 0) {
-    await context.entities.Download.update({
-      where: { id: download.id },
-      data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
-    })
-    return
-  }
+async function confirmDownloadCharge(
+  download: any,
+  context: any,
+  fileData: { downloadUrl: string; fileName: string | null; fileSize: number | null; thumbnailUrl: string | null }
+) {
+  const cost = download.creditsCharged
 
   const user = await context.entities.User.findUnique({ where: { id: download.userId } })
   if (!user) return
 
-  const newBalance = user.credits + download.creditsCharged
+  // After confirmation: credits drops by cost, reservedCredits drops by cost.
+  // Available balance (credits - reservedCredits) is unchanged — already showed lower at reserve time.
+  const newCredits = Math.max(0, user.credits - cost)
+  const newReserved = Math.max(0, user.reservedCredits - cost)
+  const newAvailable = newCredits - newReserved
 
   await Promise.all([
     context.entities.Download.update({
       where: { id: download.id },
-      data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
+      data: {
+        status: 'completed',
+        downloadUrl: fileData.downloadUrl,
+        fileName: fileData.fileName,
+        fileSize: fileData.fileSize,
+        thumbnailUrl: fileData.thumbnailUrl,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        lastPolledAt: new Date(),
+      },
     }),
     context.entities.User.update({
       where: { id: user.id },
       data: {
-        credits: newBalance,
-        lifetimeCreditsSpent: { decrement: download.creditsCharged },
+        credits: newCredits,
+        reservedCredits: newReserved,
+        lifetimeCreditsSpent: { increment: cost },
       },
     }),
     context.entities.CreditTransaction.create({
       data: {
         userId: user.id,
-        amount: download.creditsCharged,
-        balance: newBalance,
+        amount: 0, // visible balance already reduced at reserve time — net 0 here
+        balance: newAvailable,
+        type: 'download',
+        reference: download.id,
+        description: `Download confirmed — ${download.providerSlug} (${cost} credit${cost !== 1 ? 's' : ''})`,
+      },
+    }),
+  ])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleDownloadFailure — called on any failure path (Decodl error, timeout).
+//
+// Under the reserve model, NO refund is needed.
+// Credits were never permanently deducted — only reservedCredits was increased.
+// Simply decrease reservedCredits back to release the hold.
+// User's credits field is untouched → guaranteed zero net impact on balance.
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleDownloadFailure(download: any, context: any, errorMessage: string) {
+  const cost = download.creditsCharged
+
+  await context.entities.Download.update({
+    where: { id: download.id },
+    data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
+  })
+
+  if (cost <= 0) return // nothing was reserved — nothing to release
+
+  const user = await context.entities.User.findUnique({ where: { id: download.userId } })
+  if (!user) return
+
+  const newReserved = Math.max(0, user.reservedCredits - cost)
+  const newAvailable = user.credits - newReserved
+
+  await Promise.all([
+    context.entities.User.update({
+      where: { id: user.id },
+      data: { reservedCredits: newReserved },
+    }),
+    context.entities.CreditTransaction.create({
+      data: {
+        userId: user.id,
+        amount: cost, // visible balance goes back up — reservation released
+        balance: newAvailable,
         type: 'refund',
         reference: download.id,
-        description: `Refund: ${download.providerSlug} download failed`,
+        description: `Download failed — ${download.providerSlug} reservation released (no charge)`,
       },
     }),
   ])
 
-  console.log(`[Refund] ${download.creditsCharged} credits returned to user ${download.userId} — ${errorMessage}`)
+  console.log(`[Reserve] Released ${cost} reserved credits for user ${download.userId} — no charge. Reason: ${errorMessage}`)
 }

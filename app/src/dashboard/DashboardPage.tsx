@@ -102,6 +102,13 @@ export default function DashboardPage() {
 
   const { data: pricingData } = useQuery(getProviderPricing, undefined);
 
+  // Redirect admins to the admin panel immediately after login
+  useEffect(() => {
+    if (user?.isAdmin) {
+      window.location.href = routes.AdminRoute.to;
+    }
+  }, [user?.isAdmin]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "success") {
@@ -183,7 +190,8 @@ export default function DashboardPage() {
     : null;
 
   const hasVideoOptions = hdPricing || fourKPricing;
-  const creditBalance = balanceData?.credits ?? user?.credits ?? 0;
+  const creditBalance  = balanceData?.available  ?? balanceData?.credits ?? (user?.credits ?? 0) - (user?.reservedCredits ?? 0);
+  const reservedAmount = balanceData?.reservedCredits ?? user?.reservedCredits ?? 0;
   const rawDownloads = downloadsData?.downloads ?? [];
   const recentDownloads = groupDownloads(rawDownloads).slice(0, 5);
 
@@ -375,7 +383,12 @@ export default function DashboardPage() {
                   {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mb-5">credits available</p>
+              <p className="text-xs text-muted-foreground mb-1">credits available</p>
+              {reservedAmount > 0 && (
+                <p className="text-xs text-amber-500 font-semibold mb-4">
+                  {reservedAmount.toFixed(1)} reserved in active downloads
+                </p>
+              )}
               <Button size="sm" variant="default" asChild className="rounded-xl font-semibold shadow-sm">
                 <Link to={routes.PricingPageRoute.to}>
                   <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

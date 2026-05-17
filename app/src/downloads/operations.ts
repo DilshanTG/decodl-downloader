@@ -74,8 +74,9 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
   if (!user) throw new HttpError(404)
 
-  if (user.credits < creditCost) {
-    throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${user.credits.toFixed(1)}.`)
+  const available = user.credits - user.reservedCredits
+  if (available < creditCost) {
+    throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
   }
 
   const MAX_CONCURRENT = 5
@@ -86,11 +87,13 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
     throw new HttpError(429, `You already have ${activeCount} downloads in progress. Wait for them to finish before submitting more.`)
   }
 
-  const newBalance = user.credits - creditCost
+  // 4. RESERVE credits (do NOT deduct yet).
+  //    credits stays unchanged — only reservedCredits increases.
+  //    Available balance = credits - reservedCredits.
+  //    Credits are only permanently deducted when the download is confirmed complete.
+  //    On failure: reservedCredits decreases back to 0, credits untouched = full refund guaranteed.
+  const availableAfterReserve = user.credits - user.reservedCredits - creditCost
 
-  // 4. Atomically: deduct credits + create download record (status=pending) + log transaction
-  //    No Decodl call here — that happens in the background queue.
-  //    User gets a response in ~50ms regardless of Decodl's speed.
   const [download] = await Promise.all([
     context.entities.Download.create({
       data: {
@@ -108,15 +111,15 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
     }),
     context.entities.User.update({
       where: { id: user.id },
-      data: { credits: newBalance, lifetimeCreditsSpent: { increment: creditCost } },
+      data: { reservedCredits: { increment: creditCost } },
     }),
     context.entities.CreditTransaction.create({
       data: {
         userId: user.id,
         amount: -creditCost,
-        balance: newBalance,
+        balance: availableAfterReserve,
         type: 'download',
-        description: `Download from ${pricing.displayName}`,
+        description: `Credits reserved for download from ${pricing.displayName} (pending)`,
       },
     }),
   ])
@@ -140,13 +143,15 @@ export const retryFailedDownload: RetryFailedDownload<{ id: string }, any> = asy
 
   const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
   if (!user) throw new HttpError(404)
-  if (user.credits < download.creditsCharged) {
-    throw new HttpError(402, `Insufficient credits. You need ${download.creditsCharged} credits.`)
+
+  const available = user.credits - user.reservedCredits
+  if (available < download.creditsCharged) {
+    throw new HttpError(402, `Insufficient credits. You need ${download.creditsCharged} credits but have ${available.toFixed(1)} available.`)
   }
 
-  const newBalance = user.credits - download.creditsCharged
+  const availableAfterReserve = available - download.creditsCharged
 
-  // Reset to pending, deduct credits, queue — same pattern as initial submit
+  // Reserve credits for the retry — same pattern as initial submit
   await Promise.all([
     context.entities.Download.update({
       where: { id },
@@ -160,15 +165,15 @@ export const retryFailedDownload: RetryFailedDownload<{ id: string }, any> = asy
     }),
     context.entities.User.update({
       where: { id: user.id },
-      data: { credits: newBalance, lifetimeCreditsSpent: { increment: download.creditsCharged } },
+      data: { reservedCredits: { increment: download.creditsCharged } },
     }),
     context.entities.CreditTransaction.create({
       data: {
         userId: user.id,
         amount: -download.creditsCharged,
-        balance: newBalance,
+        balance: availableAfterReserve,
         type: 'download',
-        description: `Retry download from ${download.providerSlug}`,
+        description: `Credits reserved for retry — ${download.providerSlug} (pending)`,
       },
     }),
   ])

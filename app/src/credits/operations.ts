@@ -52,7 +52,7 @@ const SYNC_COOLDOWN_MS   = 2 * 60 * 1000  // don't re-check same payment within 
 const SYNC_MAX_AGE_MS    = 30 * 60 * 1000 // stop checking after 30 min (stale = cancelled)
 const DIGIMART_BASE      = 'https://pay.digimartsolutions.lk'
 
-export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number }> = async (_args, context) => {
+export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; reservedCredits: number; available: number }> = async (_args, context) => {
   if (!context.user) throw new HttpError(401)
 
   const pendingPayments = await context.entities.Payment.findMany({
@@ -140,11 +140,15 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number }> =
 
   const user = await context.entities.User.findUnique({
     where: { id: context.user.id },
-    select: { credits: true },
+    select: { credits: true, reservedCredits: true },
   })
 
   if (!user) throw new HttpError(404)
-  return { credits: user.credits }
+  return {
+    credits: user.credits,
+    reservedCredits: user.reservedCredits,
+    available: user.credits - user.reservedCredits,
+  }
 }
 
 export const claimSignupBonus: ClaimSignupBonus<void, { credits: number }> = async (
