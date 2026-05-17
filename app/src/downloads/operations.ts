@@ -83,6 +83,16 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
     throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${user.credits.toFixed(1)}.`)
   }
 
+  // Fix 5: Concurrent download cap per user (protects Decodl API + server memory)
+  // Prevents one user from queuing unlimited downloads and starving other users.
+  const MAX_CONCURRENT = 5
+  const activeCount = await context.entities.Download.count({
+    where: { userId: user.id, status: { in: ['pending', 'processing'] } },
+  })
+  if (activeCount >= MAX_CONCURRENT) {
+    throw new HttpError(429, `You already have ${activeCount} downloads in progress. Wait for them to finish before submitting more.`)
+  }
+
   // Atomic transaction: deduct credits, create download, call Decodl
   let decodlJobId: string | null = null
   let downloadStatus = 'pending'
