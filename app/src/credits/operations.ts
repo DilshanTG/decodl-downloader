@@ -7,6 +7,10 @@ import { HttpError } from 'wasp/server'
 let pricingCache: { data: any[] | null; at: number } = { data: null, at: 0 }
 const PRICING_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
+export function invalidatePricingCache() {
+  pricingCache = { data: null, at: 0 }
+}
+
 export const getProviderPricing: GetProviderPricing<void, any[]> = async (_args, context) => {
   if (pricingCache.data !== null && Date.now() - pricingCache.at < PRICING_CACHE_TTL_MS) {
     return pricingCache.data
@@ -29,7 +33,8 @@ export const getMyTransactions: GetMyTransactions<GetMyTransactionsInput, GetMyT
   if (!context.user) throw new HttpError(401)
 
   const PAGE_SIZE = 20
-  const skip = (page - 1) * PAGE_SIZE
+  const safePage = Math.max(1, Math.floor(Number(page) || 1))
+  const skip = (safePage - 1) * PAGE_SIZE
 
   const [transactions, total] = await Promise.all([
     context.entities.CreditTransaction.findMany({
@@ -41,7 +46,7 @@ export const getMyTransactions: GetMyTransactions<GetMyTransactionsInput, GetMyT
     context.entities.CreditTransaction.count({ where: { userId: context.user.id } }),
   ])
 
-  return { transactions, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { transactions, total, page: safePage, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
 // ─── Fix 2: Payment sync rate-limiter ─────────────────────────────────────────
@@ -88,29 +93,33 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
         const apiStatus = body?.data?.status ?? null
 
         if (apiStatus === 'SUCCESS') {
+          // Atomic check-and-set: only credit if payment hasn't been processed yet.
+          // Prevents double-credit when webhook and balance-sync run simultaneously.
+          const syncClaimed = await context.entities.Payment.updateMany({
+            where: { id: payment.id, status: 'pending' },
+            data: { status: 'paid', updatedAt: new Date() },
+          })
+          if (syncClaimed.count === 0) continue // already processed by webhook — skip
+
           const dbUser = await context.entities.User.findUnique({ where: { id: context.user.id } })
           if (!dbUser) continue
 
-          const newBalance = dbUser.credits + payment.creditsAwarded
+          const estimatedBalance = dbUser.credits + payment.creditsAwarded
 
           await Promise.all([
             context.entities.User.update({
               where: { id: context.user.id },
               data: {
-                credits: newBalance,
+                credits: { increment: payment.creditsAwarded },
                 lifetimeCreditsEarned: { increment: payment.creditsAwarded },
                 lifetimeSpentLKR: { increment: payment.amountLKR },
               },
-            }),
-            context.entities.Payment.update({
-              where: { id: payment.id },
-              data: { status: 'paid', updatedAt: new Date() },
             }),
             context.entities.CreditTransaction.create({
               data: {
                 userId: context.user.id,
                 amount: payment.creditsAwarded,
-                balance: newBalance,
+                balance: estimatedBalance,
                 type: 'purchase',
                 reference: payment.id,
                 description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Sync: ${payment.payhereOrderId})`,
@@ -157,33 +166,34 @@ export const claimSignupBonus: ClaimSignupBonus<void, { credits: number }> = asy
 ) => {
   if (!context.user) throw new HttpError(401)
 
-  const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
-  if (!user) throw new HttpError(404)
-
-  if (user.freeCreditsClaimed) throw new HttpError(400, 'Signup bonus already claimed')
-
   const BONUS_CREDITS = 2
-  const newBalance    = user.credits + BONUS_CREDITS
 
-  await Promise.all([
-    context.entities.User.update({
-      where: { id: user.id },
-      data: {
-        credits: newBalance,
-        lifetimeCreditsEarned: { increment: BONUS_CREDITS },
-        freeCreditsClaimed: true,
-      },
-    }),
-    context.entities.CreditTransaction.create({
-      data: {
-        userId: user.id,
-        amount: BONUS_CREDITS,
-        balance: newBalance,
-        type: 'bonus',
-        description: 'Welcome bonus — 2 free credits on signup',
-      },
-    }),
-  ])
+  // Atomic check-and-set: only update if freeCreditsClaimed is still false.
+  // Prevents race condition where two simultaneous calls both award the bonus.
+  const claimed = await context.entities.User.updateMany({
+    where: { id: context.user.id, freeCreditsClaimed: false },
+    data: {
+      credits: { increment: BONUS_CREDITS },
+      lifetimeCreditsEarned: { increment: BONUS_CREDITS },
+      freeCreditsClaimed: true,
+    },
+  })
+  if (claimed.count === 0) throw new HttpError(400, 'Signup bonus already claimed')
 
-  return { credits: newBalance }
+  const user = await context.entities.User.findUnique({
+    where: { id: context.user.id },
+    select: { credits: true },
+  })
+
+  await context.entities.CreditTransaction.create({
+    data: {
+      userId: context.user.id,
+      amount: BONUS_CREDITS,
+      balance: user?.credits ?? BONUS_CREDITS,
+      type: 'bonus',
+      description: 'Welcome bonus — 2 free credits on signup',
+    },
+  })
+
+  return { credits: user?.credits ?? BONUS_CREDITS }
 }

@@ -13,7 +13,8 @@ export const getMyDownloads: GetMyDownloads<GetMyDownloadsInput, GetMyDownloadsO
   if (!context.user) throw new HttpError(401)
 
   const PAGE_SIZE = 20
-  const skip = (page - 1) * PAGE_SIZE
+  const safePage = Math.max(1, Math.floor(Number(page) || 1))
+  const skip = (safePage - 1) * PAGE_SIZE
 
   const where: any = { userId: context.user.id }
   if (status) where.status = status
@@ -29,7 +30,7 @@ export const getMyDownloads: GetMyDownloads<GetMyDownloadsInput, GetMyDownloadsO
     context.entities.Download.count({ where }),
   ])
 
-  return { downloads, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { downloads, total, page: safePage, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
 export const getDownloadById: GetDownloadById<{ id: string }, any> = async ({ id }, context) => {
@@ -55,6 +56,11 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   context
 ) => {
   if (!context.user) throw new HttpError(401)
+
+  // Input length guards
+  if (link && link.length > 2048) throw new HttpError(400, 'URL is too long.')
+  if (code && code.length > 500)  throw new HttpError(400, 'Code is too long.')
+  if (options.length > 20)        throw new HttpError(400, 'Too many options provided.')
 
   // 1. Detect provider
   let resolvedSlug = providerSlug
@@ -215,6 +221,11 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
 ) => {
   if (!context.user) throw new HttpError(401)
 
+  // Input length guards (same limits as submitDownload)
+  if (link && link.length > 2048) throw new HttpError(400, 'URL is too long.')
+  if (code && code.length > 500)  throw new HttpError(400, 'Code is too long.')
+  if (options.length > 20)        throw new HttpError(400, 'Too many options provided.')
+
   const now = Date.now()
   const key = context.user.id
   const recent = (assetInfoCalls.get(key) || []).filter(t => now - t < 60_000)
@@ -258,7 +269,7 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
       ratio: 1.0,
       calculatedCost: pricing ? pricing.creditCost : 1.0,
       options: [],
-      error: err.message || 'Could not fetch live asset info.',
+      error: 'Could not fetch live asset info. Default pricing will be used.',
     }
   }
 }

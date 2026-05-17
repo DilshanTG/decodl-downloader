@@ -43,7 +43,7 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
   try {
     const data: Record<string, string> = req.body
 
-    const { order_id, status_code, md5sig } = data
+    const { order_id, status_code } = data
 
     if (!order_id) {
       console.error('Webhook: missing order_id')
@@ -94,11 +94,10 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
     console.log(`Webhook: order=${order_id} status=${resolvedStatus}`)
 
     if (resolvedStatus === 'SUCCESS') {
-      const newBalance = payment.user.credits + payment.creditsAwarded
-
-      // Atomic update: payment + user credits + transaction log
-      await context.entities.Payment.update({
-        where: { id: payment.id },
+      // Atomic check-and-set: prevents double-credit if webhook fires twice or
+      // races with getMyCreditBalance polling the same payment simultaneously.
+      const webhookClaimed = await context.entities.Payment.updateMany({
+        where: { id: payment.id, status: { not: 'paid' } },
         data: {
           status: 'paid',
           payherePaymentId: data.payment_id ?? data.payhere_ref ?? null,
@@ -106,16 +105,21 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
           updatedAt: new Date(),
         },
       })
+      if (webhookClaimed.count === 0) {
+        return res.status(200).send('Already processed')
+      }
 
+      // Use increment (not absolute write) so concurrent credits don't overwrite each other
       await context.entities.User.update({
         where: { id: payment.userId },
         data: {
-          credits: newBalance,
+          credits: { increment: payment.creditsAwarded },
           lifetimeCreditsEarned: { increment: payment.creditsAwarded },
           lifetimeSpentLKR: { increment: payment.amountLKR },
         },
       })
 
+      const newBalance = payment.user.credits + payment.creditsAwarded // approximate for display
       await context.entities.CreditTransaction.create({
         data: {
           userId: payment.userId,
