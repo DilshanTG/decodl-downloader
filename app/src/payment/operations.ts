@@ -56,7 +56,7 @@ export const createPayherePayment: CreatePayherePayment<
     body: JSON.stringify({
       amount: finalAmount,
       return_url: `${process.env.WASP_WEB_CLIENT_URL}/dashboard?payment=success`,
-      cancel_url: `${process.env.WASP_WEB_CLIENT_URL}/pricing`,
+      cancel_url: `${process.env.WASP_WEB_CLIENT_URL}/pricing?payment=cancelled`,
       notify_url: process.env.PAYHERE_NOTIFY_URL,
       client_order_id: clientOrderId,
       customer_email: context.user.email ?? '',

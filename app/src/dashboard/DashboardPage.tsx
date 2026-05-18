@@ -161,13 +161,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
+    const payment = params.get("payment");
+    if (payment === "success") {
       toast({
         title: "Payment successful!",
         description: "Your credits have been added. It may take a moment to reflect.",
       });
-      window.history.replaceState({}, "", window.location.pathname);
+    } else if (payment === "failed") {
+      toast({
+        title: "Payment failed",
+        description: "Your payment could not be processed. No charges were made. Try again from the Pricing page.",
+        variant: "destructive",
+      });
     }
+    if (payment) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
   useEffect(() => {

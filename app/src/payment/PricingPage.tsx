@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "wasp/client/auth";
 import { createPayherePayment, getProviderPricing } from "wasp/client/operations";
 import { useQuery } from "wasp/client/operations";
@@ -93,6 +93,26 @@ export default function PricingPage() {
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
   const [confirmPackage, setConfirmPackage] = useState<string | null>(null);
   const { data: pricingData } = useQuery(getProviderPricing);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "cancelled") {
+      toast({
+        title: "Payment cancelled",
+        description: "Your payment was cancelled. No charges were made. You can try again anytime.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (payment === "failed") {
+      toast({
+        title: "Payment failed",
+        description: "Your payment could not be processed. Please try again or use a different card.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   // Build per-slug min/max cost, grouped by category (exclude lorempicsum test provider)
   const providerGroups = (() => {
