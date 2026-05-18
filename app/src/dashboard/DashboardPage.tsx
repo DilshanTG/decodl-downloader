@@ -140,6 +140,7 @@ export default function DashboardPage() {
   }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [sandboxOpen, setSandboxOpen] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const {
@@ -416,6 +417,14 @@ export default function DashboardPage() {
       return;
     }
 
+    // Check for duplicate URL in recent downloads
+    const trimmedUrl = url.trim();
+    const isDuplicate = recentDownloads.some((d: any) => d.link === trimmedUrl || d.code === trimmedUrl);
+    if (isDuplicate && !duplicateWarning) {
+      setDuplicateWarning(true);
+      return;
+    }
+    setDuplicateWarning(false);
     setIsSubmitting(true);
     try {
       if (isUrlMode) {
@@ -576,6 +585,9 @@ export default function DashboardPage() {
                   {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
                 </div>
               )}
+              {typeof creditBalance === "number" && creditBalance > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">≈ Rs. {Math.round(creditBalance * 180).toLocaleString()} value</p>
+              )}
               <p className="text-xs text-muted-foreground mb-1">credits available</p>
               {reservedAmount > 0 && (
                 <p className="text-xs text-amber-500 font-semibold mb-2">
@@ -690,22 +702,86 @@ export default function DashboardPage() {
             </div>
 
             {activeTab === "single" ? (
+              <>
+              {/* Low balance warning */}
+              {!balanceLoading && typeof creditBalance === "number" && creditBalance < 2 && creditBalance >= 0 && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                      {creditBalance === 0 ? "No credits remaining" : `Only ${creditBalance.toFixed(1)} credit${creditBalance === 1 ? "" : "s"} left`} — top up to keep downloading
+                    </p>
+                  </div>
+                  <Link to={routes.PricingPageRoute.to} className="text-xs font-bold text-primary hover:underline shrink-0 whitespace-nowrap">
+                    Buy Credits →
+                  </Link>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit}>
                 <div className="mb-5">
                   <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
                     Paste Premium Stock URL or Code/ID
                   </label>
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={(e) => {
-                      setUrl(e.target.value);
-                      setSelectedVariant("normal");
-                    }}
-                    placeholder="https://www.shutterstock.com/... OR Shutterstock code e.g. 1883031073"
-                    className="w-full border border-border bg-background text-foreground rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-inner"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={url}
+                      onChange={(e) => {
+                        setUrl(e.target.value);
+                        setSelectedVariant("normal");
+                        setDuplicateWarning(false);
+                      }}
+                      placeholder="https://www.shutterstock.com/... OR Shutterstock code e.g. 1883031073"
+                      className="w-full border border-border bg-background text-foreground rounded-xl px-4 py-3.5 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-inner"
+                    />
+                    {!url && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            if (text) { setUrl(text); setSelectedVariant("normal"); setDuplicateWarning(false); }
+                          } catch {
+                            toast({ title: "Clipboard access denied", description: "Please paste manually.", variant: "destructive" });
+                          }
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        Paste
+                      </button>
+                    )}
+                    {url && (
+                      <button
+                        type="button"
+                        onClick={() => { setUrl(""); setSelectedVariant("normal"); setDuplicateWarning(false); setLiveInfo(null); setAssetError(null); setSelectedFormat(""); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Duplicate URL warning */}
+                {duplicateWarning && (
+                  <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400">You already downloaded this recently</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Downloading again will charge credits. Are you sure?</p>
+                    </div>
+                    <button type="button" onClick={() => setDuplicateWarning(false)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline shrink-0">
+                      Download again
+                    </button>
+                  </div>
+                )}
 
                 {/* Manual Provider Selector for Raw Codes */}
                 {url.trim().length > 0 && !isUrlMode && (
@@ -815,7 +891,12 @@ export default function DashboardPage() {
                               <span className="text-sm font-bold text-foreground truncate">{providerLabel}</span>
                             </div>
                           )}
-                          {s1 === "warning" && <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Unknown provider</p>}
+                          {s1 === "warning" && (
+                            <div>
+                              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Provider not recognised</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Supported: shutterstock.com · freepik.com · stock.adobe.com · elements.envato.com · istockphoto.com · magnific.com · alamy.com · flaticon.com + more</p>
+                            </div>
+                          )}
                           {s1 === "idle" && <p className="text-xs text-muted-foreground/50">Detecting...</p>}
                         </div>
                         {s1 === "success" && <Badge label="Detected" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
@@ -987,6 +1068,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               </form>
+              </>
             ) : (
               <form onSubmit={handleBulkSubmit}>
                 <div className="mb-5">
