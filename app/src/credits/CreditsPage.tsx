@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useQuery } from "wasp/client/operations";
 import { getMyTransactions, getMyCreditBalance } from "wasp/client/operations";
 import { Link } from "wasp/client/router";
@@ -9,7 +9,7 @@ import { Card, CardContent } from "../client/components/ui/card";
 type TxType = "purchase" | "download" | "refund" | "bonus" | "admin_adjust";
 
 const TYPE_CONFIG: Record<TxType | string, {
-  label: string; bgColor: string; textColor: string; icon: JSX.Element;
+  label: string; bgColor: string; textColor: string; icon: ReactElement;
 }> = {
   purchase: {
     label: "Top Up",
