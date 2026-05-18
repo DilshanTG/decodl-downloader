@@ -71,7 +71,7 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
       const ageMs      = Date.now() - new Date(payment.createdAt).getTime()
       const updatedMs  = Date.now() - new Date(payment.updatedAt).getTime()
 
-      // Skip: too old (likely abandoned) or checked too recently
+      // Skip: too old (likely abandoned)
       if (ageMs > SYNC_MAX_AGE_MS) {
         await context.entities.Payment.update({
           where: { id: payment.id },
@@ -79,7 +79,9 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
         })
         continue
       }
-      if (updatedMs < SYNC_COOLDOWN_MS) continue
+      // Skip if checked recently — but always check brand-new payments (updatedAt == createdAt)
+      const isNeverChecked = Math.abs(payment.updatedAt.getTime() - payment.createdAt.getTime()) < 5000
+      if (!isNeverChecked && updatedMs < SYNC_COOLDOWN_MS) continue
 
       try {
         const res = await fetch(`${DIGIMART_BASE}/api/v1/status/${payment.payhereOrderId}`, {

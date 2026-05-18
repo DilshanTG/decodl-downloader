@@ -199,6 +199,7 @@ api payhereWebhook {
 api downloadFile {
   fn: import { downloadFile } from "@src/downloads/proxy",
   entities: [Download],
+  auth: false,
   httpRoute: (GET, "/api/download-file/:id")
 }
 
@@ -342,6 +343,11 @@ route AdminSettingsRoute { path: "/admin/settings", to: AdminSettingsPage }
 page AdminSettingsPage {
   authRequired: true,
   component: import AdminSettings from "@src/admin/elements/settings/SettingsPage"
+}
+
+route RefundPolicyRoute { path: "/refund-policy", to: RefundPolicyPage }
+page RefundPolicyPage {
+  component: import RefundPolicyPage from "@src/legal/RefundPolicyPage"
 }
 
 route NotFoundRoute { path: "*", to: NotFoundPage }

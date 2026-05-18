@@ -1,11 +1,14 @@
 import {
-  Calendar,
+  BarChart3,
   ChevronDown,
   ChevronUp,
+  CreditCard,
+  Download,
   LayoutDashboard,
-  LayoutTemplate,
   Settings,
-  Sheet,
+  ShoppingBag,
+  Users,
+  Zap,
   X,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -18,6 +21,16 @@ interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (arg: boolean) => void;
 }
+
+const NAV_LINKS = [
+  { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/users", label: "Users", icon: Users, end: true },
+  { to: "/admin/downloads", label: "Downloads", icon: Download, end: true },
+  { to: "/admin/payments", label: "Payments", icon: CreditCard, end: true },
+  { to: "/admin/providers", label: "Providers", icon: Zap, end: true },
+  { to: "/admin/credits", label: "Credit Ledger", icon: BarChart3, end: true },
+  { to: "/admin/settings", label: "Settings", icon: Settings, end: true },
+];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const location = useLocation();
@@ -77,10 +90,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         },
       )}
     >
-      {/* <!-- SIDEBAR HEADER --> */}
-      <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
-        <NavLink to="/">
-          <img src={Logo} alt="Logo" width={50} />
+      {/* Sidebar Header */}
+      <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5 border-b border-border">
+        <NavLink to="/" className="flex items-center gap-2">
+          <img src={Logo} alt="Logo" width={36} className="rounded-lg" />
+          <div>
+            <p className="text-xs font-extrabold text-foreground leading-tight">StockGrab</p>
+            <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Admin Panel</p>
+          </div>
         </NavLink>
 
         <button
@@ -90,169 +107,60 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           aria-expanded={sidebarOpen}
           className="block lg:hidden"
         >
-          <X />
+          <X className="w-5 h-5" />
         </button>
       </div>
-      {/* <!-- SIDEBAR HEADER --> */}
 
-      <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-        {/* <!-- Sidebar Menu --> */}
-        <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
-          {/* <!-- Menu Group --> */}
+      <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear flex-1">
+        {/* Sidebar Menu */}
+        <nav className="mt-5 px-4 py-4 lg:mt-6 lg:px-4">
+          {/* Main Menu */}
           <div>
-            <h3 className="text-muted-foreground mb-4 ml-4 text-sm font-semibold">
-              MENU
+            <h3 className="text-muted-foreground mb-3 ml-3 text-[10px] font-extrabold uppercase tracking-widest">
+              Management
             </h3>
 
-            <ul className="mb-6 flex flex-col gap-1.5">
-              {/* <!-- Menu Item Dashboard --> */}
-              <NavLink
-                to="/admin"
-                end
-                className={({ isActive }) =>
-                  cn(
-                    "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                    {
-                      "bg-accent text-accent-foreground": isActive,
-                    },
-                  )
-                }
-              >
-                <LayoutDashboard />
-                Dashboard
-              </NavLink>
-
-              {/* <!-- Menu Item Dashboard --> */}
-
-              {/* <!-- Menu Item Users --> */}
-              <li>
-                <NavLink
-                  to="/admin/users"
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Sheet />
-                  Users
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Users --> */}
-
-              {/* <!-- Menu Item Settings --> */}
-              <li>
-                <NavLink
-                  to="/admin/settings"
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Settings />
-                  Settings
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Settings --> */}
+            <ul className="mb-6 flex flex-col gap-1">
+              {NAV_LINKS.map(({ to, label, icon: Icon, end }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      cn(
+                        "group relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-semibold text-sm duration-200 ease-in-out transition-all",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground")} />
+                        {label}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* <!-- Others Group --> */}
-          <div>
-            <h3 className="text-muted-foreground mb-4 ml-4 text-sm font-semibold">
-              Extra Components
+          {/* Quick Link back to app */}
+          <div className="border-t border-border pt-4 mt-2">
+            <h3 className="text-muted-foreground mb-3 ml-3 text-[10px] font-extrabold uppercase tracking-widest">
+              App
             </h3>
-
-            <ul className="mb-6 flex flex-col gap-1.5">
-              {/* <!-- Menu Item Calendar --> */}
-              <li>
-                <NavLink
-                  to="/admin/calendar"
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Calendar />
-                  Calendar
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Calendar --> */}
-
-              {/* <!-- Menu Item Ui Elements --> */}
-              <SidebarLinkGroup
-                activeCondition={pathname === "/ui" || pathname.includes("ui")}
-              >
-                {(handleClick, open) => {
-                  return (
-                    <React.Fragment>
-                      <NavLink
-                        to="#"
-                        className={cn(
-                          "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                          {
-                            "bg-accent text-accent-foreground":
-                              pathname.includes("ui"),
-                          },
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          sidebarExpanded
-                            ? handleClick()
-                            : setSidebarExpanded(true);
-                        }}
-                      >
-                        <LayoutTemplate />
-                        UI Elements
-                        {open ? <ChevronUp /> : <ChevronDown />}
-                      </NavLink>
-                      {/* <!-- Dropdown Menu Start --> */}
-                      <div
-                        className={cn("translate transform overflow-hidden", {
-                          hidden: !open,
-                        })}
-                      >
-                        <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
-                          <li>
-                            <NavLink
-                              to="/admin/ui/buttons"
-                              end
-                              className={({ isActive }) =>
-                                cn(
-                                  "text-muted-foreground hover:text-accent group relative flex items-center gap-2.5 rounded-md px-4 font-medium duration-300 ease-in-out",
-                                  { "text-accent!": isActive },
-                                )
-                              }
-                            >
-                              Buttons
-                            </NavLink>
-                          </li>
-                        </ul>
-                      </div>
-                      {/* <!-- Dropdown Menu End --> */}
-                    </React.Fragment>
-                  );
-                }}
-              </SidebarLinkGroup>
-              {/* <!-- Menu Item Ui Elements --> */}
-            </ul>
+            <NavLink
+              to="/dashboard"
+              className="group relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-semibold text-sm text-muted-foreground hover:bg-accent hover:text-foreground duration-200 transition-all"
+            >
+              <ShoppingBag className="w-4 h-4 shrink-0" />
+              Back to App
+            </NavLink>
           </div>
         </nav>
-        {/* <!-- Sidebar Menu --> */}
       </div>
     </aside>
   );

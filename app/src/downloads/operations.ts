@@ -86,15 +86,22 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   })
   if (!pricing) throw new HttpError(404, `Provider "${resolvedSlug}" (${resolvedVariant}) not found or inactive.`)
 
+  // Sandbox providers skip asset info lookup and credit logic entirely.
+  // Identified by slug name, not creditCost — so admin price changes can't accidentally enable billing.
+  const SANDBOX_SLUGS = new Set(['lorempicsum'])
+  const isSandbox = SANDBOX_SLUGS.has(resolvedSlug)
+
   // Credit cost = max(our DB price, Decodl's actual cost for this asset).
   // We call Decodl /info to get their real cost so the charge matches what the user saw in the preview.
   // Falls back to our DB price if Decodl /info is unavailable (fail-safe).
   let creditCost = pricing.creditCost
-  try {
-    const assetInfo = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
-    creditCost = parseFloat(Math.max(pricing.creditCost, assetInfo.ratio).toFixed(2))
-  } catch {
-    // Decodl /info failed — fall back to our DB price, which is always safe to charge
+  if (!isSandbox) {
+    try {
+      const assetInfo = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
+      creditCost = parseFloat(Math.max(pricing.creditCost, assetInfo.ratio).toFixed(2))
+    } catch {
+      // Decodl /info failed — fall back to our DB price, which is always safe to charge
+    }
   }
 
   // 3. Check user balance and concurrent cap
@@ -109,24 +116,39 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
     throw new HttpError(429, `You already have ${activeCount} downloads in progress. Wait for them to finish before submitting more.`)
   }
 
-  // 4. ATOMIC credit reserve — prevents double-submit race condition.
-  //    updateMany WHERE clause is evaluated atomically at the DB level.
-  //    Two simultaneous requests cannot both succeed: the first increments reservedCredits,
-  //    causing the second's WHERE check (reservedCredits <= credits - cost) to fail.
-  //    credits stays unchanged — only reservedCredits increases.
-  const reserved = await context.entities.User.updateMany({
-    where: {
-      id: user.id,
-      reservedCredits: { lte: user.credits - creditCost }, // atomic: credits - reservedCredits >= creditCost
-    },
-    data: { reservedCredits: { increment: creditCost } },
-  })
-  if (reserved.count === 0) {
-    const available = user.credits - user.reservedCredits
-    throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
+  // 4. ATOMIC credit reserve — skipped for sandbox (free) providers.
+  if (!isSandbox) {
+    // updateMany WHERE clause is evaluated atomically at the DB level.
+    // Two simultaneous requests cannot both succeed: the first increments reservedCredits,
+    // causing the second's WHERE check (reservedCredits <= credits - cost) to fail.
+    const reserved = await context.entities.User.updateMany({
+      where: {
+        id: user.id,
+        reservedCredits: { lte: user.credits - creditCost },
+      },
+      data: { reservedCredits: { increment: creditCost } },
+    })
+    if (reserved.count === 0) {
+      const available = user.credits - user.reservedCredits
+      throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
+    }
   }
 
-  const availableAfterReserve = user.credits - user.reservedCredits - creditCost
+  const availableAfterReserve = isSandbox
+    ? (user.credits - user.reservedCredits)
+    : (user.credits - user.reservedCredits - creditCost)
+
+  const txOps = isSandbox ? [] : [
+    context.entities.CreditTransaction.create({
+      data: {
+        userId: user.id,
+        amount: -creditCost,
+        balance: availableAfterReserve,
+        type: 'download',
+        description: `Credits reserved for download from ${pricing.displayName} (pending)`,
+      },
+    }),
+  ]
 
   const [download] = await Promise.all([
     context.entities.Download.create({
@@ -143,15 +165,7 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
         lastPolledAt: null,
       },
     }),
-    context.entities.CreditTransaction.create({
-      data: {
-        userId: user.id,
-        amount: -creditCost,
-        balance: availableAfterReserve,
-        type: 'download',
-        description: `Credits reserved for download from ${pricing.displayName} (pending)`,
-      },
-    }),
+    ...txOps,
   ])
 
   // 5. Enqueue the Decodl submission — PgBoss runs it with max 5 concurrent workers.

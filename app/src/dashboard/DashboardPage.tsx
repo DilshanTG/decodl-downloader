@@ -102,12 +102,7 @@ export default function DashboardPage() {
 
   const { data: pricingData } = useQuery(getProviderPricing, undefined);
 
-  // Redirect admins to the admin panel immediately after login
-  useEffect(() => {
-    if (user?.isAdmin) {
-      window.location.href = routes.AdminRoute.to;
-    }
-  }, [user?.isAdmin]);
+  // Removed unconditional admin redirect so admins can view the dashboard too.
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -200,6 +195,15 @@ export default function DashboardPage() {
     if (!bulkUrls.trim()) return;
 
     const lines = bulkUrls.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length > 5) {
+      toast({
+        title: "Limit Exceeded",
+        description: "You can only submit up to 5 links at a time in bulk download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const validLines = lines.map(line => {
       const isUrl = line.includes(".") || line.includes("/") || line.startsWith("http");
       if (isUrl) {
@@ -356,15 +360,55 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-10 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 pt-6">
-          <h1 className="text-3xl font-extrabold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1.5">
-            Welcome back{user?.email ? `, ${user.email.split("@")[0]}` : ""}
-          </p>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Dashboard Hero Header */}
+      <div className="relative overflow-hidden border-b border-border bg-card/50">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-16 left-0 h-64 w-64 rounded-full bg-primary/10 blur-[80px]" />
+          <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-secondary/10 blur-[70px]" />
         </div>
+        <div className="max-w-4xl mx-auto px-4 pt-10 pb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-5 object-contain" />
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Dashboard</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
+                Welcome back
+                {user?.email ? (
+                  <span className="text-primary">, {user.email.split("@")[0]}</span>
+                ) : ""}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Download premium stock assets from 20+ providers · Pay in LKR
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {!balanceLoading && (
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Balance</span>
+                  <span className="text-2xl font-black text-primary tabular-nums">
+                    {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
+                    <span className="text-sm font-bold text-muted-foreground ml-1">cr</span>
+                  </span>
+                </div>
+              )}
+              <Button size="sm" variant="default" asChild className="rounded-xl font-bold shadow-sm shadow-primary/20">
+                <Link to={routes.PricingPageRoute.to}>
+                  <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Buy Credits
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="py-8 px-4">
+      <div className="max-w-4xl mx-auto">
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
@@ -679,7 +723,7 @@ export default function DashboardPage() {
               <form onSubmit={handleBulkSubmit}>
                 <div className="mb-5">
                   <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Paste Premium URLs or Raw Codes/IDs (One Per Line)
+                    Paste Premium URLs or Raw Codes/IDs (Max 5 Per Batch)
                   </label>
                   <textarea
                     value={bulkUrls}
@@ -1021,6 +1065,22 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-16 border-t border-border pt-8 pb-6 text-center space-y-2">
+        <p className="text-xs font-bold text-foreground">StockMart.lk — by DigiMart Solutions (Pvt) Ltd</p>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+          <a href="https://digimartsolutions.lk" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">digimartsolutions.lk</a>
+          <span>·</span>
+          <a href="https://wa.me/94772503124" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">WhatsApp Support</a>
+          <span>·</span>
+          <a href="mailto:support@stockmart.lk" className="hover:text-foreground transition-colors">support@stockmart.lk</a>
+          <span>·</span>
+          <a href="/refund-policy" className="hover:text-foreground transition-colors">Refund Policy</a>
+        </div>
+        <p className="text-xs text-muted-foreground/50">© {new Date().getFullYear()} DigiMart Solutions (Pvt) Ltd · Sri Lanka</p>
+      </footer>
+    </div>
     </div>
   );
 }

@@ -33,6 +33,16 @@ export default function App() {
     );
   }, [location]);
 
+  const isAuthPage = useMemo(() => {
+    return (
+      location.pathname === routes.LoginRoute.build() ||
+      location.pathname === routes.SignupRoute.build() ||
+      location.pathname.startsWith("/request-password-reset") ||
+      location.pathname.startsWith("/password-reset") ||
+      location.pathname.startsWith("/email-verification")
+    );
+  }, [location]);
+
   const isAdminDashboard = useMemo(() => {
     return location.pathname.startsWith("/admin");
   }, [location]);
@@ -51,6 +61,8 @@ export default function App() {
     <>
       <div className="bg-background text-foreground min-h-screen">
         {isAdminDashboard ? (
+          <Outlet />
+        ) : isAuthPage ? (
           <Outlet />
         ) : (
           <>

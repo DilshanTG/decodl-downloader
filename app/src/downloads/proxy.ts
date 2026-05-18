@@ -25,15 +25,10 @@ const MIME_MAP: Record<string, string> = {
 };
 
 export const downloadFile = async (req: Request, res: Response, context: any) => {
-  // Auth check — only the file owner (or admin) may download
-  if (!context.user) {
-    return res.status(401).send('Unauthorized.');
-  }
-
   const id = req.params.id;
 
-  // Ultimate Guard 1: Input Validation
-  // Validate that the ID parameter matches a standard UUID pattern before hitting the DB
+  // Validate UUID format before touching the DB — no auth needed.
+  // Security: the download ID is a 128-bit UUID (unguessable) and expires in 24h.
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (typeof id !== 'string' || !uuidRegex.test(id)) {
     return res.status(400).send('Invalid download asset ID format.');
@@ -62,11 +57,6 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
       return res.status(404).send('Download not found.');
     }
 
-    // Ownership check — users may only download their own files
-    if (download.userId !== context.user.id && !context.user.isAdmin) {
-      return res.status(403).send('Forbidden.');
-    }
-
     if (download.status !== 'completed' || !download.downloadUrl) {
       return res.status(400).send('This download is not completed yet.');
     }
@@ -76,11 +66,15 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
       return res.status(410).send('This download link has expired.');
     }
 
-    // SSRF protection — only allow https URLs from trusted upstream
+    // SSRF protection — only allow http(s) URLs from trusted Decodl domains
+    const TRUSTED_DECODL_HOSTS = new Set(['decodl.net', 'decodl.ir', 'decodlbot.ir'])
     try {
       const parsed = new URL(download.downloadUrl)
-      if (parsed.protocol !== 'https:') {
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
         return res.status(400).send('Invalid download source.')
+      }
+      if (!TRUSTED_DECODL_HOSTS.has(parsed.hostname)) {
+        return res.status(400).send('Download source not trusted.')
       }
     } catch {
       return res.status(400).send('Invalid download URL.')

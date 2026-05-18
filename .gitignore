@@ -16,3 +16,4 @@ node_modules/
 # Wasp template folders not needed for this project
 blog/
 e2e-tests/
+.vercel

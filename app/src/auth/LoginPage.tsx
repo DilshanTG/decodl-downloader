@@ -7,27 +7,39 @@ export default function Login() {
   useRedirectIfLoggedIn();
 
   return (
-    <AuthPageLayout>
-      <LoginForm />
-      <br />
-      <span className="text-sm font-medium text-gray-900 dark:text-gray-900">
-        Don't have an account yet?{" "}
-        <WaspRouterLink to={routes.SignupRoute.to} className="underline">
-          go to signup
-        </WaspRouterLink>
-        .
-      </span>
-      <br />
-      <span className="text-sm font-medium text-gray-900">
-        Forgot your password?{" "}
-        <WaspRouterLink
-          to={routes.RequestPasswordResetRoute.to}
-          className="underline"
-        >
-          reset it
-        </WaspRouterLink>
-        .
-      </span>
+    <AuthPageLayout
+      heading="Welcome back"
+      subheading="Sign in to your StockMart account"
+    >
+      <LoginForm
+        appearance={{
+          colors: {
+            brand: "hsl(261, 91%, 55%)",
+            brandAccent: "hsl(261, 91%, 42%)",
+            submitButtonText: "#ffffff",
+          },
+        }}
+      />
+      <div className="mt-6 space-y-3 border-t border-border pt-5">
+        <p className="text-sm text-muted-foreground text-center">
+          Don't have an account?{" "}
+          <WaspRouterLink
+            to={routes.SignupRoute.to}
+            className="font-bold text-primary hover:underline"
+          >
+            Sign up free
+          </WaspRouterLink>
+        </p>
+        <p className="text-sm text-muted-foreground text-center">
+          Forgot your password?{" "}
+          <WaspRouterLink
+            to={routes.RequestPasswordResetRoute.to}
+            className="font-bold text-primary hover:underline"
+          >
+            Reset it
+          </WaspRouterLink>
+        </p>
+      </div>
     </AuthPageLayout>
   );
 }

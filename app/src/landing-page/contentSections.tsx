@@ -3,9 +3,6 @@ import kivo from "../client/static/examples/kivo.webp";
 import messync from "../client/static/examples/messync.webp";
 import microinfluencerClub from "../client/static/examples/microinfluencers.webp";
 import promptpanda from "../client/static/examples/promptpanda.webp";
-import reviewradar from "../client/static/examples/reviewradar.webp";
-import scribeist from "../client/static/examples/scribeist.webp";
-import searchcraft from "../client/static/examples/searchcraft.webp";
 import type { GridFeature } from "./components/FeaturesGrid";
 
 export const features: GridFeature[] = [
@@ -124,10 +121,13 @@ export const footerNavigation = {
     { name: "Pricing", href: "/pricing" },
     { name: "Login", href: "/login" },
     { name: "Sign Up", href: "/signup" },
+    { name: "Refund Policy", href: "/refund-policy" },
   ],
   company: [
-    { name: "DigiMart Solutions", href: "https://digimart.lk" },
-    { name: "Support Email", href: "mailto:support@digimart.lk" },
+    { name: "DigiMart Solutions (Pvt) Ltd", href: "https://digimartsolutions.lk" },
+    { name: "WhatsApp Support", href: "https://wa.me/94772503124" },
+    { name: "support@stockmart.lk", href: "mailto:support@stockmart.lk" },
+    { name: "Refund Policy", href: "/refund-policy" },
   ],
 };
 

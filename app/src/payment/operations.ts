@@ -49,7 +49,9 @@ export const createPayherePayment: CreatePayherePayment<
     },
     body: JSON.stringify({
       amount: pkg.amountLKR,
-      return_url: process.env.PAYHERE_RETURN_URL,
+      // Derive return/cancel URLs from WASP_WEB_CLIENT_URL so one env var controls all frontend URLs
+      return_url: `${process.env.WASP_WEB_CLIENT_URL}/dashboard?payment=success`,
+      cancel_url: `${process.env.WASP_WEB_CLIENT_URL}/pricing`,
       notify_url: process.env.PAYHERE_NOTIFY_URL,
       client_order_id: clientOrderId,
       customer_email: context.user.email ?? '',

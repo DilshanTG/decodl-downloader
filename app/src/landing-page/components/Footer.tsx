@@ -12,25 +12,32 @@ export default function Footer({
   };
 }) {
   return (
-    <div className="dark:bg-boxdark-2 mx-auto mt-6 max-w-7xl px-6 lg:px-8">
-      <footer
-        aria-labelledby="footer-heading"
-        className="relative border-t border-gray-900/10 py-24 sm:mt-32 dark:border-gray-200/10"
-      >
-        <h2 id="footer-heading" className="sr-only">
-          Footer
-        </h2>
-        <div className="mt-10 flex items-start justify-end gap-20">
+    <footer className="border-t border-border bg-card/50 mt-24">
+      <div className="mx-auto max-w-6xl px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+
+          {/* Brand column */}
+          <div className="md:col-span-1">
+            <div className="mb-4">
+              <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-8 object-contain" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              Sri Lanka's premium stock media download platform. Pay in LKR. Download from 20+ global providers.
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              By <a href="https://digimartsolutions.lk" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">DigiMart Solutions (Pvt) Ltd</a>
+            </p>
+          </div>
+
+          {/* App links */}
           <div>
-            <h3 className="text-sm font-semibold leading-6 text-gray-900 dark:text-white">
-              App
-            </h3>
-            <ul role="list" className="mt-6 space-y-4">
-              {footerNavigation.app.map((item) => (
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Platform</h3>
+            <ul className="space-y-3">
+              {footerNavigation.app.map(item => (
                 <li key={item.name}>
                   <a
                     href={item.href}
-                    className="text-sm leading-6 text-gray-600 hover:text-gray-900 dark:text-white"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {item.name}
                   </a>
@@ -38,16 +45,18 @@ export default function Footer({
               ))}
             </ul>
           </div>
+
+          {/* Company links */}
           <div>
-            <h3 className="text-sm font-semibold leading-6 text-gray-900 dark:text-white">
-              Company
-            </h3>
-            <ul role="list" className="mt-6 space-y-4">
-              {footerNavigation.company.map((item) => (
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Company</h3>
+            <ul className="space-y-3">
+              {footerNavigation.company.map(item => (
                 <li key={item.name}>
                   <a
                     href={item.href}
-                    className="text-sm leading-6 text-gray-600 hover:text-gray-900 dark:text-white"
+                    target={item.href.startsWith("http") ? "_blank" : undefined}
+                    rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {item.name}
                   </a>
@@ -56,7 +65,18 @@ export default function Footer({
             </ul>
           </div>
         </div>
-      </footer>
-    </div>
+
+        {/* Bottom bar */}
+        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground/60">
+            © {new Date().getFullYear()} DigiMart Solutions (Pvt) Ltd · Sri Lanka · All rights reserved
+          </p>
+          <div className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-muted-foreground/60">All systems operational</span>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }

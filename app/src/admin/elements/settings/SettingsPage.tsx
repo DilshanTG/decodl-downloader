@@ -1,205 +1,117 @@
-import { FileText, Mail, Upload, User } from "lucide-react";
-import { FormEvent } from "react";
 import { type AuthUser } from "wasp/auth";
-import { Button } from "../../../client/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../../client/components/ui/card";
-import { Input } from "../../../client/components/ui/input";
-import { Label } from "../../../client/components/ui/label";
-import { Textarea } from "../../../client/components/ui/textarea";
-import Breadcrumb from "../../layout/Breadcrumb";
+import { useQuery, adminGetOverviewStats } from "wasp/client/operations";
 import DefaultLayout from "../../layout/DefaultLayout";
+import Breadcrumb from "../../layout/Breadcrumb";
+import { Shield, Server, Database, Clock, Users, Zap } from "lucide-react";
 
-const SettingsPage = ({ user }: { user: AuthUser }) => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    // TODO implement
-    event.preventDefault();
-    alert("Not yet implemented");
-  };
+function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
+      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className={`text-sm font-bold text-foreground ${mono ? "font-mono text-xs" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-border flex items-center gap-2.5 bg-accent/20">
+        <Icon className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-extrabold text-foreground uppercase tracking-widest">{title}</h3>
+      </div>
+      <div className="px-6 py-2">{children}</div>
+    </div>
+  );
+}
+
+export default function SettingsPage({ user }: { user: AuthUser }) {
+  const { data: stats } = useQuery(adminGetOverviewStats, undefined);
+
+  const nodeEnv = (import.meta as any).env?.MODE ?? "unknown";
 
   return (
     <DefaultLayout user={user}>
-      <div className="max-w-270 mx-auto">
-        <Breadcrumb pageName="Settings" />
-
-        <div className="grid grid-cols-5 gap-8">
-          <div className="col-span-5 xl:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-5.5 gap-5.5 flex flex-col sm:flex-row">
-                    <div className="w-full sm:w-1/2">
-                      <Label
-                        htmlFor="full-name"
-                        className="text-foreground mb-3 block text-sm font-medium"
-                      >
-                        Full Name
-                      </Label>
-                      <div className="relative">
-                        <User className="left-4.5 text-muted-foreground absolute top-2 h-5 w-5" />
-                        <Input
-                          className="pl-11.5"
-                          type="text"
-                          name="fullName"
-                          id="full-name"
-                          placeholder="Devid Jhon"
-                          defaultValue="Devid Jhon"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="w-full sm:w-1/2">
-                      <Label
-                        htmlFor="phone-number"
-                        className="text-foreground mb-3 block text-sm font-medium"
-                      >
-                        Phone Number
-                      </Label>
-                      <Input
-                        type=""
-                        name="phoneNumber"
-                        id="phone-number"
-                        placeholder="+990 3343 7865"
-                        defaultValue="+990 3343 7865"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-5.5">
-                    <Label
-                      htmlFor="email-address"
-                      className="text-foreground mb-3 block text-sm font-medium"
-                    >
-                      Email Address
-                    </Label>
-                    <div className="relative">
-                      <Mail className="left-4.5 text-muted-foreground absolute top-2 h-5 w-5" />
-                      <Input
-                        className="pl-11.5"
-                        type="email"
-                        name="emailAddress"
-                        id="email-address"
-                        placeholder="devidjond45@gmail.com"
-                        defaultValue="devidjond45@gmail.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-5.5">
-                    <Label
-                      htmlFor="username"
-                      className="text-foreground mb-3 block text-sm font-medium"
-                    >
-                      Username
-                    </Label>
-                    <Input
-                      type="text"
-                      name="Username"
-                      id="username"
-                      placeholder="devidjhon24"
-                      defaultValue="devidjhon24"
-                    />
-                  </div>
-
-                  <div className="mb-5.5">
-                    <Label
-                      htmlFor="bio"
-                      className="text-foreground mb-3 block text-sm font-medium"
-                    >
-                      BIO
-                    </Label>
-                    <div className="relative">
-                      <FileText className="left-4.5 text-muted-foreground absolute top-4 h-5 w-5" />
-                      <Textarea
-                        className="border-border bg-background pl-11.5 pr-4.5 text-foreground focus:border-primary w-full rounded border py-3 focus-visible:outline-hidden"
-                        name="bio"
-                        id="bio"
-                        rows={6}
-                        placeholder="Write your bio here"
-                        defaultValue="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque posuere fermentum urna, eu condimentum mauris tempus ut. Donec fermentum blandit aliquet."
-                      ></Textarea>
-                    </div>
-                  </div>
-
-                  <div className="gap-4.5 flex justify-end">
-                    <Button variant="outline" type="submit">
-                      Cancel
-                    </Button>
-                    <Button type="submit">Save</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-          <div className="col-span-5 xl:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Photo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form action="#">
-                  <div className="mb-4 flex items-center gap-3">
-                    <div className="h-14 w-14 rounded-full">
-                      {/* <img src={userThree} alt="User" /> */}
-                    </div>
-                    <div>
-                      <span className="text-foreground mb-1.5">
-                        Edit your photo
-                      </span>
-                      <span className="flex gap-2.5">
-                        <button className="hover:text-primary text-sm">
-                          Delete
-                        </button>
-                        <button className="hover:text-primary text-sm">
-                          Update
-                        </button>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    id="FileUpload"
-                    className="mb-5.5 border-primary bg-background sm:py-7.5 relative block w-full cursor-pointer appearance-none rounded border-2 border-dashed px-4 py-4"
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 z-50 m-0 h-full w-full cursor-pointer p-0 opacity-0 outline-hidden"
-                    />
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <span className="border-border bg-background flex h-10 w-10 items-center justify-center rounded-full border">
-                        <Upload className="text-primary h-4 w-4" />
-                      </span>
-                      <p>
-                        <span className="text-primary">Click to upload</span> or
-                        drag and drop
-                      </p>
-                      <p className="mt-1.5">SVG, PNG, JPG or GIF</p>
-                      <p>(max, 800 X 800px)</p>
-                    </div>
-                  </div>
-
-                  <div className="gap-4.5 flex justify-end">
-                    <Button variant="outline" type="submit">
-                      Cancel
-                    </Button>
-                    <Button type="submit">Save</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="max-w-4xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-black text-foreground">Settings & System Info</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Platform configuration and operational overview</p>
         </div>
+
+        {/* Admin Account */}
+        <SectionCard title="Admin Account" icon={Shield}>
+          <InfoRow label="Email" value={user.email ?? "—"} />
+          <InfoRow label="Role" value={
+            <span className="inline-flex items-center text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-primary/15 text-primary">Super Admin</span>
+          } />
+          <InfoRow label="User ID" value={user.id} mono />
+          <InfoRow label="Admin Since" value={new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long" })} />
+        </SectionCard>
+
+        {/* Platform Stats Snapshot */}
+        <SectionCard title="Platform Snapshot" icon={Database}>
+          <InfoRow label="Total Users" value={(stats?.totalUsers ?? 0).toLocaleString()} />
+          <InfoRow label="Total Downloads" value={(stats?.totalDownloads ?? 0).toLocaleString()} />
+          <InfoRow label="Completed Downloads" value={(stats?.completedDownloads ?? 0).toLocaleString()} />
+          <InfoRow label="Failed Downloads" value={(stats?.failedDownloads ?? 0).toLocaleString()} />
+          <InfoRow label="Pending Queue" value={(stats?.pendingDownloads ?? 0).toLocaleString()} />
+          <InfoRow label="Processing Now" value={(stats?.processingDownloads ?? 0).toLocaleString()} />
+          <InfoRow label="Total Revenue (LKR)" value={`Rs. ${((stats?.totalRevenueLKR ?? 0) / 100).toLocaleString()}`} />
+          <InfoRow label="Total Credits Issued" value={(stats?.totalCreditsIssued ?? 0).toFixed(1)} />
+        </SectionCard>
+
+        {/* Scheduled Jobs */}
+        <SectionCard title="Scheduled Jobs" icon={Clock}>
+          <InfoRow
+            label="pollDecodlJobs"
+            value={<span className="text-xs font-mono bg-muted px-2 py-1 rounded-lg">Every minute (*/1 * * * *)</span>}
+          />
+          <InfoRow
+            label="expireOldDownloads"
+            value={<span className="text-xs font-mono bg-muted px-2 py-1 rounded-lg">Daily at midnight (0 0 * * *)</span>}
+          />
+          <InfoRow
+            label="dailyStatsJob"
+            value={<span className="text-xs font-mono bg-muted px-2 py-1 rounded-lg">Hourly (0 * * * *)</span>}
+          />
+        </SectionCard>
+
+        {/* Environment */}
+        <SectionCard title="Server Environment" icon={Server}>
+          <InfoRow label="Environment" value={
+            <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${nodeEnv === "production" ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}>
+              {nodeEnv.toUpperCase()}
+            </span>
+          } />
+          <InfoRow label="Wasp Version" value="0.22.x" />
+          <InfoRow label="Decodl Base URL" value="https://decodl.ir" mono />
+          <InfoRow label="Payment Gateway" value="PayHere (LKR)" />
+          <InfoRow label="Database" value="PostgreSQL via Prisma" />
+          <InfoRow label="Auth Method" value="Email + Password" />
+        </SectionCard>
+
+        {/* Quick Actions */}
+        <SectionCard title="Quick Navigation" icon={Zap}>
+          <div className="py-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { href: "/admin/users", label: "Manage Users", color: "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20" },
+              { href: "/admin/downloads", label: "All Downloads", color: "bg-primary/10 text-primary hover:bg-primary/20" },
+              { href: "/admin/payments", label: "Payment History", color: "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" },
+              { href: "/admin/providers", label: "Edit Providers", color: "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20" },
+              { href: "/admin/credits", label: "Credit Ledger", color: "bg-purple-500/10 text-purple-500 hover:bg-purple-500/20" },
+              { href: "/dashboard", label: "← User App", color: "bg-muted text-muted-foreground hover:bg-accent" },
+            ].map(link => (
+              <a
+                key={link.href}
+                href={link.href}
+                className={`flex items-center justify-center text-xs font-bold py-3 px-4 rounded-xl transition-colors ${link.color}`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </SectionCard>
       </div>
     </DefaultLayout>
   );
-};
-
-export default SettingsPage;
+}

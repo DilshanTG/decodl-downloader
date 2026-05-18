@@ -212,69 +212,71 @@
 }
 
 @layer base {
+  /* ── StockMart Brand: Primary #6b00f6 (purple) · Accent #f7a102 (orange) — exact logo colors ── */
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 266 30% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --card-accent: 0 0% 100%;
-    --card-accent-foreground: 0 0% 3.9%;
-    --card-subtle: 31 57% 96%;
-    --card-subtle-foreground: 0 0% 9%;
+    --card-foreground: 266 30% 8%;
+    --card-accent: 266 60% 97%;
+    --card-accent-foreground: 266 30% 8%;
+    --card-subtle: 266 40% 96%;
+    --card-subtle-foreground: 266 30% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 210 100% 13%;
+    --popover-foreground: 266 30% 8%;
+    --primary: 266 100% 48%;          /* #6b00f6 exact logo purple */
     --primary-foreground: 0 0% 98%;
-    --secondary: 32 100% 37%;
-    --secondary-foreground: 0 0% 9%;
-    --secondary-muted: 32 75% 78%;
-    --secondary-muted-foreground: 0 0% 3.9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 33 74% 62%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 39 98% 49%;          /* #f7a102 exact logo orange */
+    --secondary-foreground: 0 0% 98%;
+    --secondary-muted: 39 80% 78%;
+    --secondary-muted-foreground: 266 30% 8%;
+    --muted: 266 20% 95%;
+    --muted-foreground: 266 10% 44%;
+    --accent: 266 50% 93%;
+    --accent-foreground: 266 100% 38%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --success: 141 71% 48%;
+    --success: 141 71% 42%;
     --success-foreground: 0 0% 98%;
-    --warning: 36 100% 50%;
+    --warning: 39 98% 49%;
     --warning-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
+    --border: 266 20% 88%;
+    --input: 266 20% 88%;
+    --ring: 266 100% 55%;
+    --radius: 0.625rem;
   }
 
   .dark {
-    --background: 210 50% 5%;
-    --foreground: 0 0% 98%;
-    --card: 210 50% 5%;
-    --card-foreground: 0 0% 98%;
-    --card-accent: 31 57% 93%;
-    --card-accent-foreground: 0 0% 3.9%;
-    --card-subtle: 233 24% 15%;
-    --card-subtle-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 31 57% 93%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 209 91% 61%;
+    /* Deep purple-tinted dark — feels rich and branded */
+    --background: 266 28% 6%;
+    --foreground: 0 0% 95%;
+    --card: 266 25% 9%;
+    --card-foreground: 0 0% 95%;
+    --card-accent: 266 20% 13%;
+    --card-accent-foreground: 0 0% 95%;
+    --card-subtle: 266 22% 12%;
+    --card-subtle-foreground: 0 0% 95%;
+    --popover: 266 28% 7%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 266 95% 68%;           /* Lighter logo purple on dark bg */
+    --primary-foreground: 266 28% 6%;
+    --secondary: 39 95% 55%;          /* Logo orange */
     --secondary-foreground: 0 0% 98%;
-    --secondary-muted: 210 67% 94%;
-    --secondary-muted-foreground: 0 0% 3.9%;
-    --muted: 210 100% 13%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 31 57% 93%;
-    --accent-foreground: 210 100% 13%;
-    --destructive: 0 62.8% 63%;
+    --secondary-muted: 39 50% 25%;
+    --secondary-muted-foreground: 39 80% 80%;
+    --muted: 266 22% 14%;
+    --muted-foreground: 266 10% 58%;
+    --accent: 266 40% 16%;
+    --accent-foreground: 266 80% 80%;
+    --destructive: 0 63% 58%;
     --destructive-foreground: 0 0% 98%;
     --success: 141 71% 48%;
     --success-foreground: 0 0% 98%;
-    --warning: 36 100% 50%;
+    --warning: 39 95% 55%;
     --warning-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 266 20% 16%;
+    --input: 266 20% 16%;
+    --ring: 266 95% 68%;
   }
 }
 

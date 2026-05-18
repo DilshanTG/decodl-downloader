@@ -77,31 +77,73 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-12 px-4">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Hero */}
-      <div className="max-w-4xl mx-auto text-center mb-16 pt-10">
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
-          Simple, <span className="text-gradient-primary">Transparent Pricing</span>
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-          Buy credits in LKR. No subscriptions, no hidden fees. Download from 20+ premium stock providers on your own schedule.
-        </p>
-        {!user && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            <Link to={routes.SignupRoute.to} className="text-primary hover:underline font-semibold">
-              Create a free account
-            </Link>{" "}
-            to get 2 bonus credits.
+      <section className="relative overflow-hidden pt-20 pb-16 px-4">
+        {/* Background glow orbs */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-[500px] w-[500px] rounded-full bg-primary/15 blur-[120px]" />
+          <div className="absolute top-32 -right-20 h-64 w-64 rounded-full bg-secondary/15 blur-[100px]" />
+          <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/10 blur-[80px]" />
+        </div>
+
+        <div className="max-w-4xl mx-auto text-center">
+          {/* Badge */}
+          <div className="flex justify-center mb-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-bold text-primary tracking-wide uppercase">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              Pay in LKR · No Subscriptions
+            </span>
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-5 leading-[1.08]">
+            Simple,{" "}
+            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              Transparent
+            </span>{" "}
+            Pricing
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Buy credits in <strong className="text-foreground">LKR</strong>. No subscriptions, no hidden fees.
+            Download from <strong className="text-foreground">20+ premium stock providers</strong> on your own schedule.
           </p>
-        )}
-      </div>
+          {!user && (
+            <p className="mt-5 text-sm text-muted-foreground">
+              <Link to={routes.SignupRoute.to} className="text-primary hover:underline font-bold">
+                Create a free account
+              </Link>{" "}
+              to get{" "}
+              <strong className="text-foreground">2 bonus credits</strong> — no card required.
+            </p>
+          )}
+
+          {/* Quick stats */}
+          <div className="mt-10 inline-flex flex-wrap justify-center gap-6 text-center border border-border/60 rounded-2xl px-8 py-4 bg-card/60 backdrop-blur-sm shadow-sm">
+            {[
+              { value: "20+", label: "Providers" },
+              { value: "LKR", label: "Local Currency" },
+              { value: "∞", label: "Credits Never Expire" },
+              { value: "2", label: "Free Credits on Signup" },
+            ].map(stat => (
+              <div key={stat.label} className="flex flex-col items-center min-w-[80px]">
+                <span className="text-xl font-black text-primary">{stat.value}</span>
+                <span className="text-xs text-muted-foreground mt-0.5 font-medium">{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="px-4 pb-20">
 
       <div className="max-w-6xl mx-auto">
-        {/* Package cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
+        {/* Package cards — 6 tiers, 3-col on desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {CREDIT_PACKAGES.map((pkg) => {
             const isPopular = "popular" in pkg && pkg.popular;
+            const badge = "badge" in pkg ? pkg.badge : null;
             const isLoading = loadingPackage === pkg.id;
+            const savings = "savings" in pkg ? pkg.savings : null;
 
             return (
               <Card
@@ -113,10 +155,10 @@ export default function PricingPage() {
                 }`}
                 variant="bento"
               >
-                {isPopular && (
+                {badge && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                     <span className="bg-primary text-primary-foreground text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap shadow-md">
-                      Most Popular
+                      {badge}
                     </span>
                   </div>
                 )}
@@ -138,7 +180,7 @@ export default function PricingPage() {
                       <svg className="w-4.5 h-4.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-foreground font-semibold">{pkg.credits} credits</span>
+                      <span className="text-foreground font-semibold">{pkg.credits} {pkg.credits === 1 ? "credit" : "credits"}</span>
                     </li>
                     <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                       <svg className="w-4.5 h-4.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,12 +188,12 @@ export default function PricingPage() {
                       </svg>
                       <span>Rs. {pkg.perCredit}/credit</span>
                     </li>
-                    {"savings" in pkg && pkg.savings ? (
+                    {savings ? (
                       <li className="flex items-center gap-2.5 text-sm text-green-600 dark:text-green-400 font-medium">
                         <svg className="w-4.5 h-4.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
-                        <span>Save Rs. {pkg.savings.toLocaleString()}</span>
+                        <span>Save Rs. {savings.toLocaleString()}</span>
                       </li>
                     ) : null}
                     <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
@@ -159,6 +201,12 @@ export default function PricingPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
                       <span>Credits never expire</span>
+                    </li>
+                    <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <svg className="w-4.5 h-4.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>All 20+ providers included</span>
                     </li>
                   </ul>
 
@@ -251,10 +299,14 @@ export default function PricingPage() {
         {/* Contact note */}
         <p className="text-center text-sm text-muted-foreground mt-10">
           Questions? Email us at{" "}
-          <a href="mailto:support@digimart.lk" className="text-primary hover:underline font-semibold">
-            support@digimart.lk
+          <a href="mailto:support@stockmart.lk" className="text-primary hover:underline font-semibold">
+            support@stockmart.lk
+          </a>{" "}or WhatsApp{" "}
+          <a href="https://wa.me/94772503124" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-semibold">
+            +94 77 250 3124
           </a>
         </p>
+      </div>
       </div>
     </div>
   );

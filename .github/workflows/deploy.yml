@@ -1,0 +1,65 @@
+name: Deploy StockMart
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Install Wasp ───────────────────────────────────────────────────────
+      - name: Install Wasp CLI
+        run: curl -sSL https://get.wasp-lang.dev/installer.sh | sh -s -- -v 0.15.3
+
+      - name: Add Wasp to PATH
+        run: echo "$HOME/.wasp/bin" >> $GITHUB_PATH
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Build Wasp project
+        working-directory: app
+        run: wasp build
+
+      # ── Deploy Backend → Railway ───────────────────────────────────────────
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend to Railway
+        working-directory: app/.wasp/out
+        run: railway up --service stockmart --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # ── Deploy Frontend → Vercel ───────────────────────────────────────────
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Build frontend
+        working-directory: app
+        run: REACT_APP_API_URL=https://stockmart-production.up.railway.app npx vite build
+
+      - name: Write Vercel rewrite config
+        run: |
+          printf '{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}' \
+            > app/.wasp/out/web-app/build/vercel.json
+
+      - name: Deploy frontend to Vercel
+        working-directory: app/.wasp/out/web-app/build
+        run: vercel --prod --yes --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

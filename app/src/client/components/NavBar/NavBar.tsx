@@ -14,7 +14,7 @@ import { throttleWithTrailingInvocation } from "../../../shared/utils";
 import { UserDropdown } from "../../../user/UserDropdown";
 import { UserMenuItems } from "../../../user/UserMenuItems";
 import { useIsLandingPage } from "../../hooks/useIsLandingPage";
-import logo from "../../static/logo.webp";
+// logo import removed — using branded text logo
 import { cn } from "../../utils";
 import DarkModeSwitcher from "../DarkModeSwitcher";
 import { Announcement } from "./Announcement";
@@ -75,20 +75,9 @@ export default function NavBar({
             <div className="flex items-center gap-6">
               <WaspRouterLink
                 to={routes.LandingPageRoute.to}
-                className="text-foreground hover:text-primary flex items-center transition-colors duration-300 ease-in-out"
+                className="flex items-center gap-2 transition-opacity hover:opacity-80"
               >
                 <NavLogo isScrolled={isScrolled} />
-                <span
-                  className={cn(
-                    "text-foreground leading-6 font-semibold transition-all duration-300",
-                    {
-                      "ml-2 text-sm": !isScrolled,
-                      "ml-2 text-xs": isScrolled,
-                    },
-                  )}
-                >
-                  StockMart.lk
-                </span>
               </WaspRouterLink>
 
               <ul className="ml-4 hidden items-center gap-6 lg:flex">
@@ -179,8 +168,7 @@ function NavBarMobileMenu({
         <SheetContent side="right" className="w-[300px] sm:w-[400px]">
           <SheetHeader>
             <SheetTitle className="flex items-center">
-              <WaspRouterLink to={routes.LandingPageRoute.to}>
-                <span className="sr-only">StockMart.lk</span>
+                <WaspRouterLink to={routes.LandingPageRoute.to}>
                 <NavLogo isScrolled={false} />
               </WaspRouterLink>
             </SheetTitle>
@@ -246,11 +234,8 @@ function renderNavigationItems(
 
 const NavLogo = ({ isScrolled }: { isScrolled: boolean }) => (
   <img
-    className={cn("transition-all duration-500", {
-      "size-8": !isScrolled,
-      "size-7": isScrolled,
-    })}
-    src={logo}
+    src="/stockmart-logo.svg"
     alt="StockMart.lk"
+    className={cn("transition-all duration-300 object-contain", isScrolled ? "h-7" : "h-9")}
   />
 );

@@ -4,6 +4,8 @@ export const seedProviderPricing = async (prisma: PrismaClient) => {
   console.log('Seeding ProviderPricing table...')
 
   const providers = [
+    // Sandbox / Test (free, no credits deducted)
+    { slug: 'lorempicsum', variant: 'normal', displayName: 'StockMart Sandbox (Free)', category: 'test', creditCost: 0, sortOrder: 0, websiteUrl: 'https://picsum.photos' },
     // Images - no options
     { slug: 'shutterstock', variant: 'normal', displayName: 'Shutterstock', category: 'image', creditCost: 1, sortOrder: 1, websiteUrl: 'https://shutterstock.com' },
     { slug: 'shutterstock', variant: 'offset', displayName: 'Shutterstock (Offset)', category: 'image', creditCost: 15, sortOrder: 2, websiteUrl: 'https://shutterstock.com' },

@@ -1,4 +1,10 @@
-const DECODL_BASE_URL = 'https://decodl.ir/api/product/dev'
+// All known Decodl domains — tried in order, fallback on network/gateway failure.
+// decodl.net geo-blocks some regions (returns 403 HTML), so it goes last.
+const DECODL_DOMAINS = [
+  'https://decodl.ir',
+  'https://decodlbot.ir',
+  'https://decodl.net',
+]
 
 function getHeaders() {
   return {
@@ -8,17 +14,86 @@ function getHeaders() {
   }
 }
 
+// Internal option names that are StockMart-specific and must never be sent to Decodl.
+const INTERNAL_OPTION_NAMES = new Set(['isBulk', 'batchId', 'batchIndex', 'batchTotal'])
+
+function filterOptions(options?: Array<{ name: string; value: string }>) {
+  if (!options || options.length === 0) return undefined
+  const filtered = options.filter(o => !INTERNAL_OPTION_NAMES.has(o.name))
+  return filtered.length > 0 ? filtered : undefined
+}
+
+// Tries path (relative to domain) on each domain in order.
+// Falls back to the next domain on infrastructure failures.
+// Throws the last infrastructure error if all domains fail.
+// Returns { response, data } where data is already parsed JSON.
+async function fetchWithFallback(
+  pathFn: (domain: string) => string,
+  init: RequestInit,
+): Promise<{ response: Response; data: any }> {
+  let lastError: any = null
+
+  for (const domain of DECODL_DOMAINS) {
+    const url = pathFn(domain)
+    let response: Response
+    let data: any
+
+    try {
+      response = await fetch(url, init)
+    } catch (networkErr) {
+      // Network-level failure (DNS, ECONNREFUSED, timeout) — try next domain
+      console.warn(`[Decodl] Network error on ${domain}:`, networkErr)
+      lastError = networkErr
+      continue
+    }
+
+    try {
+      const text = await response.text()
+      data = JSON.parse(text)
+    } catch {
+      // Non-JSON body (HTML error page) — try next domain
+      console.warn(`[Decodl] Non-JSON response from ${domain} (HTTP ${response.status})`)
+      lastError = Object.assign(
+        new Error(`Provider API unavailable (HTTP ${response.status}). Retrying...`),
+        { statusCode: response.status, code: 'gateway-error' }
+      )
+      continue
+    }
+
+    // 5xx from any domain means infrastructure failure — try next
+    if (response.status >= 500) {
+      console.warn(`[Decodl] 5xx from ${domain} (HTTP ${response.status})`)
+      lastError = Object.assign(
+        new Error(data?.message || `Server error (HTTP ${response.status})`),
+        { statusCode: response.status, code: 'server-error' }
+      )
+      continue
+    }
+
+    // Got a real response (2xx or 4xx) — stop here, this domain is working
+    console.log(`[Decodl] Success via ${domain} (HTTP ${response.status})`)
+    return { response, data }
+  }
+
+  // All domains failed — surface the last error
+  throw lastError ?? new Error('All provider API endpoints are currently unreachable. Please try again in a few minutes.')
+}
+
 export function scrubDecodlBrand(message: string): string {
   if (!message) return message;
   
   return message
     .replace(/@decodl_support/gi, '@stockmart_support')
+    .replace(/decodlbot\.ir/gi, 'stockmart.lk')
     .replace(/decodl\.net/gi, 'stockmart.lk')
     .replace(/decodl\.ir/gi, 'stockmart.lk')
+    .replace(/decodlbot/gi, 'StockMart')
     .replace(/decodl/gi, 'StockMart')
-    .replace(/09399417568/gi, 'our support team')
-    .replace(/telegram number/gi, 'telegram channel')
-    .replace(/telegram/gi, 'support channels');
+    .replace(/09399417568/gi, '+94772503124')
+    .replace(/telegram number/gi, 'WhatsApp')
+    .replace(/telegram/gi, 'WhatsApp')
+    .replace(/purchase a package/gi, 'top up your credits at stockmart.lk/pricing')
+    .replace(/purchase/gi, 'top up credits');
 }
 
 export type DecodlJobStatus = 'pending' | 'processing' | 'completed' | 'failed'
@@ -77,17 +152,15 @@ export async function submitDecodlDownload(params: DecodlSubmitParams): Promise<
     body.providerName = params.providerName
   }
 
-  if (params.options && params.options.length > 0) {
-    body.options = params.options
+  const cleanOptions = filterOptions(params.options)
+  if (cleanOptions) {
+    body.options = cleanOptions
   }
 
-  const response = await fetch(DECODL_BASE_URL, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(body),
-  })
-
-  const data = await response.json() as any
+  const { response, data } = await fetchWithFallback(
+    (domain) => `${domain}/api/product/dev`,
+    { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) },
+  )
 
   if (!response.ok) {
     const code = data.code
@@ -100,23 +173,18 @@ export async function submitDecodlDownload(params: DecodlSubmitParams): Promise<
 
 // Decodl status check — the status endpoint is GET /api/job/dev/:jobId
 export async function checkDecodlJobStatus(jobId: string): Promise<DecodlStatusResult> {
-  const statusUrl = `https://decodl.ir/api/job/dev/${jobId}`
-
-  const response = await fetch(statusUrl, {
-    method: 'GET',
-    headers: getHeaders(),
-  })
+  const { response, data } = await fetchWithFallback(
+    (domain) => `${domain}/api/job/dev/${jobId}`,
+    { method: 'GET', headers: getHeaders() },
+  )
 
   if (response.status === 404) {
     return { status: 'failed', errorMessage: 'Job not found', errorCode: 404024 }
   }
 
   if (!response.ok) {
-    const data = await response.json() as any
     throw Object.assign(new Error(data.message || 'Status check failed'), { statusCode: response.status })
   }
-
-  const data = await response.json() as any
 
   // 1. Handle failure and error responses
   const errorCode = data.errorCode || data.code;
@@ -203,7 +271,6 @@ export interface DecodlAssetInfoResult {
 }
 
 export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<DecodlAssetInfoResult> {
-  const infoUrl = 'https://decodl.ir/api/product/dev/info'
   const body: Record<string, any> = {}
 
   if (params.providerName === 'lorempicsum' || params.link?.includes('picsum') || params.link?.includes('lorempicsum')) {
@@ -221,17 +288,15 @@ export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<De
     body.providerName = params.providerName
   }
 
-  if (params.options && params.options.length > 0) {
-    body.options = params.options
+  const cleanOpts = filterOptions(params.options)
+  if (cleanOpts) {
+    body.options = cleanOpts
   }
 
-  const response = await fetch(infoUrl, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(body),
-  })
-
-  const data = await response.json() as any
+  const { response, data } = await fetchWithFallback(
+    (domain) => `${domain}/api/product/dev/info`,
+    { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) },
+  )
 
   if (!response.ok) {
     const code = data.code

@@ -4,15 +4,27 @@ import { AuthPageLayout } from "../AuthPageLayout";
 
 export function EmailVerificationPage() {
   return (
-    <AuthPageLayout>
-      <VerifyEmailForm />
-      <br />
-      <span className="text-sm font-medium text-gray-900">
-        If everything is okay,{" "}
-        <WaspRouterLink to={routes.LoginRoute.to} className="underline">
-          go to login
-        </WaspRouterLink>
-      </span>
+    <AuthPageLayout
+      heading="Verify your email"
+      subheading="Enter the code sent to your inbox"
+    >
+      <VerifyEmailForm
+        appearance={{
+          colors: {
+            brand: "hsl(261, 91%, 55%)",
+            brandAccent: "hsl(261, 91%, 42%)",
+            submitButtonText: "#ffffff",
+          },
+        }}
+      />
+      <div className="mt-5 border-t border-border pt-4">
+        <p className="text-sm text-muted-foreground text-center">
+          Already verified?{" "}
+          <WaspRouterLink to={routes.LoginRoute.to} className="font-bold text-primary hover:underline">
+            Go to login
+          </WaspRouterLink>
+        </p>
+      </div>
     </AuthPageLayout>
   );
 }

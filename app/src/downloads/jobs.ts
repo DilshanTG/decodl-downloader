@@ -1,4 +1,5 @@
 import { checkDecodlJobStatus, submitDecodlDownload, scrubDecodlBrand } from '../decodl/client'
+import { sendDownloadReadyEmail, sendDownloadFailedEmail } from './emails'
 
 // ─── Concurrency gate for Decodl submissions ──────────────────────────────────
 // PgBoss worker teamSize isn't configurable via Wasp's DSL, so we implement
@@ -228,6 +229,21 @@ async function confirmDownloadCharge(
   })
   if (claimed.count === 0) return // already completed by a concurrent worker
 
+  // Send email notification (non-blocking — never stops the download flow)
+  const userForEmail = await context.entities.User.findUnique({
+    where: { id: download.userId },
+    select: { email: true, credits: true, reservedCredits: true },
+  })
+  if (userForEmail?.email) {
+    sendDownloadReadyEmail({
+      toEmail: userForEmail.email,
+      providerSlug: download.providerSlug,
+      fileName: fileData.fileName,
+      downloadId: download.id,
+      creditsCharged: cost,
+    })
+  }
+
   if (cost <= 0) return // zero-cost (admin free retry) — nothing to deduct
 
   // ── Credit deduction ───────────────────────────────────────────────────────
@@ -282,6 +298,20 @@ async function handleDownloadFailure(download: any, context: any, errorMessage: 
     data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
   })
   if (claimed.count === 0) return // already in a terminal state — skip
+
+  // Send failure email (non-blocking)
+  const userForEmail = await context.entities.User.findUnique({
+    where: { id: download.userId },
+    select: { email: true },
+  })
+  if (userForEmail?.email && cost > 0) {
+    sendDownloadFailedEmail({
+      toEmail: userForEmail.email,
+      providerSlug: download.providerSlug,
+      errorMessage,
+      creditsRefunded: cost,
+    })
+  }
 
   if (cost <= 0) return // zero-cost download — no reservation to release
 

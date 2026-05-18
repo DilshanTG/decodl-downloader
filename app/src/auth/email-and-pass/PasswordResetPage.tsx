@@ -4,13 +4,27 @@ import { AuthPageLayout } from "../AuthPageLayout";
 
 export function PasswordResetPage() {
   return (
-    <AuthPageLayout>
-      <ResetPasswordForm />
-      <br />
-      <span className="text-sm font-medium text-gray-900">
-        If everything is okay,{" "}
-        <WaspRouterLink to={routes.LoginRoute.to}>go to login</WaspRouterLink>
-      </span>
+    <AuthPageLayout
+      heading="Reset your password"
+      subheading="Enter your new password below"
+    >
+      <ResetPasswordForm
+        appearance={{
+          colors: {
+            brand: "hsl(261, 91%, 55%)",
+            brandAccent: "hsl(261, 91%, 42%)",
+            submitButtonText: "#ffffff",
+          },
+        }}
+      />
+      <div className="mt-5 border-t border-border pt-4">
+        <p className="text-sm text-muted-foreground text-center">
+          Password reset?{" "}
+          <WaspRouterLink to={routes.LoginRoute.to} className="font-bold text-primary hover:underline">
+            Go to login
+          </WaspRouterLink>
+        </p>
+      </div>
     </AuthPageLayout>
   );
 }
