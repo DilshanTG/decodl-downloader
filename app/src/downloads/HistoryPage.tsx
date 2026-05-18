@@ -100,9 +100,9 @@ export default function HistoryPage() {
                 <Button
                   key={f.value}
                   onClick={() => { setStatusFilter(f.value); setPage(1); }}
-                  variant={statusFilter === f.value ? "default" : "secondary"}
+                  variant={statusFilter === f.value ? "default" : "outline"}
                   size="sm"
-                  className="rounded-lg text-xs font-semibold px-3 h-8 border border-border"
+                  className="rounded-lg text-xs font-semibold px-3 h-8"
                 >
                   {f.label}
                 </Button>

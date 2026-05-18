@@ -795,7 +795,7 @@ export default function DashboardPage() {
                   };
 
                   const Badge = ({ label, color }: { label: string; color: string }) => (
-                    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${color}`}>
+                    <span className={`hidden sm:inline-block shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${color}`}>
                       {label}
                     </span>
                   );
@@ -804,57 +804,49 @@ export default function DashboardPage() {
                     <div className="mb-5 rounded-2xl border border-border bg-card shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
 
                       {/* Step 1 — Provider Detection */}
-                      <div className="flex items-center gap-3.5 px-5 py-4 border-b border-border">
+                      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border">
                         <Dot s={s1} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 1 · Provider</p>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Provider</p>
                           {s1 === "success" && (
-                            <div className="flex items-center gap-2">
-                              <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto object-contain"
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto shrink-0 object-contain"
                                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                              <span className="text-sm font-bold text-foreground">{providerLabel}</span>
+                              <span className="text-sm font-bold text-foreground truncate">{providerLabel}</span>
                             </div>
                           )}
-                          {s1 === "warning" && <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Unknown provider — paste a supported URL</p>}
-                          {s1 === "idle" && <p className="text-sm text-muted-foreground/50">Detecting provider...</p>}
+                          {s1 === "warning" && <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Unknown provider</p>}
+                          {s1 === "idle" && <p className="text-xs text-muted-foreground/50">Detecting...</p>}
                         </div>
                         {s1 === "success" && <Badge label="Detected" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
                         {s1 === "warning" && <Badge label="Unknown" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
                       </div>
 
                       {/* Step 2 — Asset Verification */}
-                      <div className="flex items-start gap-3.5 px-5 py-4 border-b border-border">
+                      <div className="flex items-start gap-3 px-4 py-3.5 border-b border-border">
                         <Dot s={s2} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 2 · Asset Check</p>
-                          {s2 === "idle" && <p className="text-sm text-muted-foreground/50">Waiting for provider detection...</p>}
-                          {s2 === "loading" && <p className="text-sm font-semibold text-primary animate-pulse">Querying asset availability...</p>}
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Asset Check</p>
+                          {s2 === "idle" && <p className="text-xs text-muted-foreground/50">Waiting...</p>}
+                          {s2 === "loading" && <p className="text-sm font-semibold text-primary animate-pulse">Verifying...</p>}
                           {s2 === "success" && assetCost != null && (
                             <p className="text-sm font-bold text-foreground">
-                              Available · <span className="text-primary">{assetCost} {assetCost === 1 ? "credit" : "credits"}</span>
+                              Available · <span className="text-primary">{assetCost} cr</span>
                             </p>
                           )}
                           {s2 === "editorial" && (
                             <div>
-                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Editorial Content — Cannot Download</p>
-                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                This asset is licensed for editorial/news use only and cannot be downloaded for commercial use via this service.
-                              </p>
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Editorial — Cannot Download</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">Licensed for news use only, not commercial download.</p>
                             </div>
                           )}
                           {s2 === "warning" && assetError?.type === "no-package" && (
-                            <div>
-                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Service Temporarily Unavailable</p>
-                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{assetError.message}</p>
-                            </div>
+                            <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Service Unavailable</p>
                           )}
                           {s2 === "error" && assetError && (
-                            <div>
-                              <p className="text-sm font-bold text-red-600 dark:text-red-400">
-                                {assetError.type === "not-found" ? "Asset Not Found" : "Verification Failed"}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{assetError.message}</p>
-                            </div>
+                            <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                              {assetError.type === "not-found" ? "Asset Not Found" : "Verification Failed"}
+                            </p>
                           )}
                         </div>
                         {s2 === "success" && assetCost != null && <Badge label={`${assetCost} cr`} color="text-green-600 dark:text-green-400 bg-green-500/10" />}
@@ -864,24 +856,24 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Step 3 — Credit Check */}
-                      <div className="flex items-start gap-3.5 px-5 py-4">
+                      <div className="flex items-start gap-3 px-4 py-3.5">
                         <Dot s={s3} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 3 · Credit Check</p>
-                          {s3 === "idle" && <p className="text-sm text-muted-foreground/50">Waiting for asset verification...</p>}
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Credits</p>
+                          {s3 === "idle" && <p className="text-xs text-muted-foreground/50">Waiting...</p>}
                           {s3 === "success" && assetCost != null && (
                             <p className="text-sm font-bold text-foreground">
-                              Balance OK · <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> remaining after download
+                              <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> left after download
                             </p>
                           )}
                           {s3 === "warning" && assetCost != null && (
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                                Need {assetCost} cr · You have {creditBalance.toFixed(1)} cr
+                                Need {assetCost} cr · Have {creditBalance.toFixed(1)} cr
                               </p>
                               <Link
                                 to={routes.PricingPageRoute.to}
-                                className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity w-fit"
+                                className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-2.5 py-1 rounded-lg hover:opacity-90 transition-opacity"
                               >
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
@@ -891,7 +883,7 @@ export default function DashboardPage() {
                             </div>
                           )}
                         </div>
-                        {s3 === "success" && <Badge label="Balance OK" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
+                        {s3 === "success" && <Badge label="OK" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
                         {s3 === "warning" && <Badge label="Top Up" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
                       </div>
 
