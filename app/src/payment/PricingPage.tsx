@@ -194,7 +194,46 @@ export default function PricingPage() {
       <div className="px-4 pb-20">
 
       <div className="max-w-6xl mx-auto">
+
+        {/* Credit cost per provider — logo grid (shown FIRST so users know what they can download) */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold tracking-tight text-center mb-2">What Can You Download?</h2>
+          <p className="text-sm text-muted-foreground text-center mb-10">
+            One credit balance works across all 20+ providers. Credit costs vary by provider and file type.
+          </p>
+
+          {(["image", "icon", "video"] as const).map((cat) => {
+            const providers = providerGroups[cat];
+            if (!providers?.length) return null;
+            return (
+              <div key={cat} className="mb-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {CATEGORY_LABELS[cat]}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {providers.map((p) => (
+                    <ProviderLogoCard
+                      key={p.slug}
+                      slug={p.slug}
+                      name={p.name}
+                      minCost={p.minCost}
+                      maxCost={p.maxCost}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Package cards — 6 tiers, 3-col on desktop */}
+        <div className="mb-4 text-center">
+          <h2 className="text-2xl font-bold tracking-tight mb-2">Choose Your Credit Pack</h2>
+          <p className="text-sm text-muted-foreground">Buy once, use anytime. Credits never expire.</p>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {CREDIT_PACKAGES.map((pkg) => {
             const isPopular = "popular" in pkg && pkg.popular;
@@ -224,6 +263,9 @@ export default function PricingPage() {
                   <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                     {pkg.name}
                   </span>
+                  {isPopular && (
+                    <p className="text-xs text-primary font-semibold mt-0.5">Best value · Chosen by most users</p>
+                  )}
                   <div className="my-2">
                     <span className="text-4xl font-extrabold tracking-tight">
                       Rs. {pkg.priceLKR.toLocaleString()}
@@ -309,40 +351,6 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Credit cost per provider — logo grid */}
-        <div className="mb-20">
-          <h2 className="text-2xl font-bold tracking-tight text-center mb-2">Supported Providers</h2>
-          <p className="text-sm text-muted-foreground text-center mb-10">
-            Credit costs are shown before every download. Some variants (4K video, offset images) cost more.
-          </p>
-
-          {(["image", "icon", "video"] as const).map((cat) => {
-            const providers = providerGroups[cat];
-            if (!providers?.length) return null;
-            return (
-              <div key={cat} className="mb-10">
-                <div className="flex items-center gap-3 mb-5">
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {CATEGORY_LABELS[cat]}
-                  </span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {providers.map((p) => (
-                    <ProviderLogoCard
-                      key={p.slug}
-                      slug={p.slug}
-                      name={p.name}
-                      minCost={p.minCost}
-                      maxCost={p.maxCost}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
         {/* Full credit cost breakdown table */}
         <div className="mb-20">
           <h2 className="text-2xl font-bold tracking-tight text-center mb-2">Full Credit Cost Breakdown</h2>
@@ -402,8 +410,8 @@ export default function PricingPage() {
                               <span className={`inline-block font-extrabold text-sm px-2.5 py-0.5 rounded-full ${
                                 p.creditCost === 0 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
                                 p.creditCost <= 1 ? "bg-primary/10 text-primary" :
-                                p.creditCost <= 5 ? "bg-secondary/10 text-secondary" :
-                                "bg-destructive/10 text-destructive"
+                                p.creditCost <= 5 ? "bg-primary/10 text-primary" :
+                                "bg-secondary/10 text-secondary"
                               }`}>
                                 {p.creditCost} cr
                               </span>

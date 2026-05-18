@@ -95,14 +95,14 @@ export default function HistoryPage() {
         <Card className="border-border shadow-md p-4 mb-6 bg-card" variant="bento">
           <CardContent className="p-0 flex flex-col sm:flex-row gap-4 items-center justify-between">
             {/* Status filters */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 sm:flex-wrap">
               {STATUS_FILTERS.map((f) => (
                 <Button
                   key={f.value}
                   onClick={() => { setStatusFilter(f.value); setPage(1); }}
                   variant={statusFilter === f.value ? "default" : "outline"}
                   size="sm"
-                  className="rounded-lg text-xs font-semibold px-3 h-8"
+                  className="rounded-lg text-xs font-semibold px-3 h-8 shrink-0"
                 >
                   {f.label}
                 </Button>
@@ -141,14 +141,23 @@ export default function HistoryPage() {
                 ))
               ) : downloads.length === 0 ? (
                 <div className="py-16 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </div>
                   <p className="text-muted-foreground text-sm font-medium">No downloads found</p>
-                  {(statusFilter || providerFilter) && (
+                  {(statusFilter || providerFilter) ? (
                     <Button
                       onClick={() => { setStatusFilter(""); setProviderFilter(""); setPage(1); }}
                       variant="link"
                       className="text-primary text-sm hover:underline mt-2"
                     >
                       Clear filters
+                    </Button>
+                  ) : (
+                    <Button asChild variant="default" size="sm" className="mt-4 rounded-xl font-bold text-xs">
+                      <Link to={routes.DashboardRoute?.to || "/dashboard"}>Download your first asset →</Link>
                     </Button>
                   )}
                 </div>
@@ -190,6 +199,9 @@ export default function HistoryPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-3">
                         <span className="text-xs text-muted-foreground font-bold">{d.creditsCharged ? `${d.creditsCharged.toFixed(1)} credits` : "—"}</span>
+                        {!d.isBulk && d.status === "completed" && isExpired(d) && (
+                          <span className="text-xs text-muted-foreground font-bold px-1.5 py-0.5 rounded border border-border">Expired</span>
+                        )}
                         <div className="ml-auto flex gap-2">
                           {!d.isBulk && d.status === "completed" && d.downloadUrl && !isExpired(d) && (
                             <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3">
@@ -238,15 +250,19 @@ export default function HistoryPage() {
                     [1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)
                   ) : downloads.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-16 text-center text-muted-foreground text-sm font-medium">
-                        No downloads found.
-                        {(statusFilter || providerFilter) && (
+                      <td colSpan={5} className="py-16 text-center">
+                        <p className="text-muted-foreground text-sm font-medium mb-2">No downloads found.</p>
+                        {(statusFilter || providerFilter) ? (
                           <Button
                             onClick={() => { setStatusFilter(""); setProviderFilter(""); setPage(1); }}
                             variant="link"
-                            className="text-primary ml-1 hover:underline text-sm font-semibold"
+                            className="text-primary hover:underline text-sm font-semibold"
                           >
                             Clear filters
+                          </Button>
+                        ) : (
+                          <Button asChild variant="default" size="sm" className="mt-2 rounded-xl font-bold text-xs">
+                            <Link to={routes.DashboardRoute?.to || "/dashboard"}>Download your first asset →</Link>
                           </Button>
                         )}
                       </td>

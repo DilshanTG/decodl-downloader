@@ -94,12 +94,18 @@ export default function Hero() {
                 src={`/provider-logos/${p.slug}.svg`}
                 alt={p.label}
                 className="h-5 w-auto object-contain"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.style.display = "none";
+                  const fallback = img.nextElementSibling as HTMLElement | null;
+                  if (fallback) fallback.style.display = "inline";
+                }}
               />
+              <span className="hidden text-xs font-semibold text-muted-foreground">{p.label}</span>
             </span>
           ))}
           <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground/60">
-            +12 more
+            +{20 - PROVIDER_PILLS.length} more
           </span>
         </div>
 
@@ -120,23 +126,34 @@ export default function Hero() {
                 placeholder="https://www.shutterstock.com/image-photo/..."
                 className="flex-1 rounded-xl border border-border bg-background/60 px-4 py-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
-              <Button disabled className="rounded-xl px-6 font-bold opacity-70 cursor-not-allowed">
-                Download
-              </Button>
+              <WaspRouterLink
+                to={routes.SignupRoute.to}
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 font-bold text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                Try Free →
+              </WaspRouterLink>
             </div>
 
             {detected ? (
-              <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-green-500/25 bg-green-500/10 px-4 py-3">
-                <svg className="h-4 w-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm text-green-600 dark:text-green-400">
-                  <strong>{detected.provider}</strong> — {detected.cost}
-                </span>
+              <div className="mt-3 flex items-center justify-between gap-2.5 rounded-xl border border-green-500/25 bg-green-500/10 px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <svg className="h-4 w-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-green-600 dark:text-green-400">
+                    <strong>{detected.provider}</strong> — {detected.cost}
+                  </span>
+                </div>
+                <WaspRouterLink
+                  to={routes.SignupRoute.to}
+                  className="text-xs font-bold text-primary hover:underline whitespace-nowrap"
+                >
+                  Download now →
+                </WaspRouterLink>
               </div>
             ) : (
               <p className="mt-3 text-xs text-muted-foreground text-center">
-                Sign up free to download. <strong className="text-foreground">No subscription required.</strong>
+                Preview cost instantly. <strong className="text-foreground">Sign up free to download.</strong>
               </p>
             )}
           </div>

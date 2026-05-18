@@ -31,9 +31,9 @@ export default function Testimonials({
     <div className="mx-auto mt-32 max-w-7xl sm:mt-56 sm:px-6 lg:px-8">
       <SectionTitle title="What Our Users Say" />
 
-      <div className="relative z-10 w-full columns-1 gap-2 px-4 md:columns-2 md:gap-6 md:px-0 lg:columns-3">
+      <div className="relative z-10 w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0">
         {testimonials.slice(0, itemsToShow).map((testimonial, idx) => (
-          <div key={idx} className="mb-6 break-inside-avoid">
+          <div key={idx}>
             <Card className="flex flex-col justify-between">
               <CardContent className="p-6">
                 <blockquote className="mb-4 leading-6">

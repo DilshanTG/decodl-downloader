@@ -41,9 +41,9 @@ function ProviderLogo({ slug, label }: { slug: string; label: string }) {
 function MarqueeRow({ providers, reverse = false }: { providers: typeof PROVIDERS_ROW1; reverse?: boolean }) {
   const doubled = [...providers, ...providers];
   return (
-    <div className="relative flex overflow-hidden">
+    <div className="group relative flex overflow-hidden">
       <div
-        className={`flex items-center animate-marquee ${reverse ? "animate-marquee-reverse" : ""}`}
+        className={`flex items-center animate-marquee group-hover:[animation-play-state:paused] ${reverse ? "animate-marquee-reverse" : ""}`}
         style={{ willChange: "transform" }}
       >
         {doubled.map((p, i) => (

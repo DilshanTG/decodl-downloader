@@ -10,14 +10,14 @@ export const userMenuItems = [
     isAuthRequired: true,
   },
   {
-    name: "Download History",
+    name: "Downloads",
     to: routes.DownloadHistoryRoute.to,
     icon: History,
     isAdminOnly: false,
     isAuthRequired: true,
   },
   {
-    name: "Credit History",
+    name: "Credits",
     to: routes.CreditsRoute.to,
     icon: Coins,
     isAdminOnly: false,

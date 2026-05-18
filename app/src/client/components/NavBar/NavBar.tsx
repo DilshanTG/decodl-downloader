@@ -50,27 +50,12 @@ export default function NavBar({
   return (
     <>
       {isLandingPage && <Announcement />}
-      <header
-        className={cn(
-          "sticky top-0 z-50 transition-all duration-300",
-          isScrolled && "top-4",
-        )}
-      >
-        <div
-          className={cn("transition-all duration-300", {
-            "bg-background/90 border-border mx-4 rounded-full border pr-2 shadow-lg backdrop-blur-lg md:mx-20 lg:pr-0":
-              isScrolled,
-            "bg-background/80 border-border mx-0 border-b backdrop-blur-lg":
-              !isScrolled,
-          })}
-        >
+      <header className="sticky top-0 z-50">
+        <div className="bg-background/90 border-b border-border backdrop-blur-lg">
           <nav
             className={cn(
-              "flex items-center justify-between transition-all duration-300",
-              {
-                "p-3 lg:px-6": isScrolled,
-                "p-6 lg:px-8": !isScrolled,
-              },
+              "flex items-center justify-between transition-[padding] duration-200 mx-auto max-w-(--breakpoint-2xl)",
+              isScrolled ? "px-6 lg:px-8 py-2" : "px-6 lg:px-8 py-4",
             )}
             aria-label="Global"
           >
@@ -90,7 +75,7 @@ export default function NavBar({
               isScrolled={isScrolled}
               navigationItems={navigationItems}
             />
-            <NavBarDesktopUserDropdown isScrolled={isScrolled} />
+            <NavBarDesktopUserDropdown />
           </nav>
         </div>
       </header>
@@ -98,13 +83,13 @@ export default function NavBar({
   );
 }
 
-function NavBarCreditSection({ isScrolled }: { isScrolled: boolean }) {
+function NavBarCreditSection() {
   const { data: balanceData } = useQuery(getMyCreditBalance);
   const creditBalance = balanceData?.available ?? (balanceData as any)?.credits ?? 0;
 
   return (
     <div className="flex items-center gap-2">
-      <div className={cn("flex items-center gap-1", isScrolled ? "text-xs" : "text-sm")}>
+      <div className="flex items-center gap-1 text-sm">
         <span className="text-muted-foreground font-medium">Balance:</span>
         <span className="font-black text-primary tabular-nums">
           {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
@@ -113,10 +98,7 @@ function NavBarCreditSection({ isScrolled }: { isScrolled: boolean }) {
       </div>
       <WaspRouterLink
         to={routes.PricingPageRoute.to}
-        className={cn(
-          "flex items-center gap-1 rounded-lg font-bold bg-primary text-primary-foreground transition-opacity hover:opacity-90",
-          isScrolled ? "text-xs px-2.5 py-1" : "text-xs px-3 py-1.5",
-        )}
+        className="flex items-center gap-1 rounded-lg font-bold bg-primary text-primary-foreground text-xs px-3 py-1.5 transition-opacity hover:opacity-90"
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -127,7 +109,7 @@ function NavBarCreditSection({ isScrolled }: { isScrolled: boolean }) {
   );
 }
 
-function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
+function NavBarDesktopUserDropdown() {
   const { data: user, isLoading: isUserLoading } = useAuth();
 
   return (
@@ -138,28 +120,15 @@ function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
       {isUserLoading ? null : !user ? (
         <WaspRouterLink
           to={routes.LoginRoute.to}
-          className={cn(
-            "ml-3 leading-6 font-semibold transition-all duration-300",
-            {
-              "text-sm": !isScrolled,
-              "text-xs": isScrolled,
-            },
-          )}
+          className="ml-3 text-sm leading-6 font-semibold"
         >
           <div className="text-foreground hover:text-primary flex items-center transition-colors duration-300 ease-in-out">
-            Log in{" "}
-            <LogIn
-              size={isScrolled ? "1rem" : "1.1rem"}
-              className={cn("transition-all duration-300", {
-                "mt-[0.1rem] ml-1": !isScrolled,
-                "ml-1": isScrolled,
-              })}
-            />
+            Log in <LogIn size="1.1rem" className="mt-[0.1rem] ml-1" />
           </div>
         </WaspRouterLink>
       ) : (
         <div className="ml-3 flex items-center gap-3">
-          <NavBarCreditSection isScrolled={isScrolled} />
+          <NavBarCreditSection />
           <UserDropdown user={user} />
         </div>
       )}
@@ -220,7 +189,7 @@ function NavBarMobileMenu({
                 ) : (
                   <>
                     <div className="mb-4 pb-4 border-b border-border">
-                      <NavBarCreditSection isScrolled={false} />
+                      <NavBarCreditSection />
                     </div>
                     <ul className="space-y-2">
                       <UserMenuItems
@@ -269,10 +238,10 @@ function renderNavigationItems(
   });
 }
 
-const NavLogo = ({ isScrolled }: { isScrolled: boolean }) => (
+const NavLogo = ({ isScrolled: _ }: { isScrolled: boolean }) => (
   <img
     src="/stockmart-logo.svg"
     alt="StockMart.lk"
-    className={cn("transition-all duration-300 object-contain", isScrolled ? "h-10" : "h-14")}
+    className="h-10 object-contain"
   />
 );

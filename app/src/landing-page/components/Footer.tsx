@@ -71,10 +71,6 @@ export default function Footer({
           <p className="text-xs text-muted-foreground/60">
             © {new Date().getFullYear()} DigiMart Solutions (Pvt) Ltd · Sri Lanka · All rights reserved
           </p>
-          <div className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-muted-foreground/60">All systems operational</span>
-          </div>
         </div>
       </div>
     </footer>

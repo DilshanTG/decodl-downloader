@@ -225,10 +225,17 @@ export default function CreditsPage() {
                   </svg>
                 </div>
                 <p className="text-muted-foreground text-sm font-medium">No transactions yet</p>
-                {typeFilter && (
+                {typeFilter ? (
                   <button onClick={() => setTypeFilter("")} className="text-primary text-xs hover:underline mt-1">
                     Clear filter
                   </button>
+                ) : (
+                  <Link
+                    to={routes.DashboardRoute.to}
+                    className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-primary hover:underline"
+                  >
+                    Download your first asset →
+                  </Link>
                 )}
               </div>
             ) : (
@@ -280,7 +287,7 @@ export default function CreditsPage() {
                           {isPositive ? "+" : ""}{tx.amount.toFixed(1)} cr
                         </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                          Balance: {tx.balance.toFixed(1)} cr
+                          Balance after: {tx.balance.toFixed(1)} cr
                         </p>
                       </div>
                     </div>

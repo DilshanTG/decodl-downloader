@@ -27,7 +27,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
+function ExpiryCountdown({ expiresAt, onExpire }: { expiresAt: string; onExpire?: () => void }) {
   const [remaining, setRemaining] = useState("");
 
   useEffect(() => {
@@ -35,6 +35,7 @@ function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
       const diff = new Date(expiresAt).getTime() - Date.now();
       if (diff <= 0) {
         setRemaining("Expired");
+        onExpire?.();
         return;
       }
       const h = Math.floor(diff / 3_600_000);
@@ -394,7 +395,7 @@ export default function DetailPage() {
                 {download.expiresAt && download.status === "completed" && !isExpired && (
                   <div className="flex justify-between text-sm">
                     <dt className="text-muted-foreground font-semibold">Expires In</dt>
-                    <dd><ExpiryCountdown expiresAt={download.expiresAt} /></dd>
+                    <dd><ExpiryCountdown expiresAt={download.expiresAt} onExpire={refetch} /></dd>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">

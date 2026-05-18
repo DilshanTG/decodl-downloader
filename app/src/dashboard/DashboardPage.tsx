@@ -139,6 +139,7 @@ export default function DashboardPage() {
     id: string; type: "success" | "error"; title: string; body: string; read: boolean; ts: number;
   }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [sandboxOpen, setSandboxOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const {
@@ -487,7 +488,6 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-5 object-contain" />
                 <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Dashboard</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
@@ -935,6 +935,11 @@ export default function DashboardPage() {
                                 );
                               })}
                             </div>
+                            {opt.name.toLowerCase() === "quality" && (
+                              <p className="text-[11px] text-muted-foreground mt-1.5">
+                                HD = 1080p · 4K = 2160p ultra resolution
+                              </p>
+                            )}
                           </div>
                         );
                       })}
@@ -1149,15 +1154,30 @@ export default function DashboardPage() {
 
         {/* 🛠️ Developer Sandbox Tool */}
         <Card className="border-border shadow-md p-6 mb-8 bg-card" variant="bento">
-          <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <span className="text-primary">🛠️</span> Developer Sandbox Tool
-            </CardTitle>
-            <CardDescription className="text-xs mt-1">
-              Test your integration using free sandbox test codes with LoremPicsum.
-            </CardDescription>
+          <CardHeader className="p-0">
+            <button
+              type="button"
+              onClick={() => setSandboxOpen((v) => !v)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <span className="text-primary">🛠️</span> Developer Sandbox Tool
+              </CardTitle>
+              <svg
+                className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${sandboxOpen ? "rotate-180" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {!sandboxOpen && (
+              <CardDescription className="text-xs mt-1">
+                Test your integration using free sandbox test codes with LoremPicsum.
+              </CardDescription>
+            )}
           </CardHeader>
-          <CardContent className="p-0">
+          {sandboxOpen && (
+          <CardContent className="p-0 mt-4">
             <div className="space-y-4">
               <p className="text-[11px] text-muted-foreground leading-normal">
                 To test different response states without active packages, click a test code below to auto-load it with the <strong>LoremPicsum</strong> provider:
@@ -1235,6 +1255,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </CardContent>
+          )}
         </Card>
 
         {/* Recent Downloads */}
@@ -1260,7 +1281,14 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <p className="text-muted-foreground text-sm font-medium">No downloads yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Paste a premium stock URL above to get started.</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-4">Paste a stock URL above and download your first asset.</p>
+                <a
+                  href="#download-form"
+                  onClick={(e) => { e.preventDefault(); document.querySelector("input[type='url']")?.scrollIntoView({ behavior: "smooth", block: "center" }); (document.querySelector("input[type='url']") as HTMLElement)?.focus(); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                >
+                  Download your first asset →
+                </a>
               </div>
             ) : (
               <div className="divide-y divide-border">
