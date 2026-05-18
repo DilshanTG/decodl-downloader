@@ -174,18 +174,36 @@ export default function HistoryPage() {
                   return (
                     <div key={d.id} className="p-4">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-foreground">
-                            {d.providerSlug}
-                            {d.isBulk && (
-                              <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                Bulk ({d.items.length})
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(d.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                          </p>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-16 h-9 bg-white rounded-lg flex items-center justify-center px-1.5 shrink-0">
+                            <img
+                              src={`/provider-logos/png/${d.providerSlug}.png`}
+                              alt={d.providerSlug}
+                              className="h-6 w-full object-contain"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (!img.dataset.triedSvg) {
+                                  img.dataset.triedSvg = "1";
+                                  img.src = `/provider-logos/${d.providerSlug}.svg`;
+                                } else {
+                                  img.style.display = "none";
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-foreground">
+                              {d.providerSlug}
+                              {d.isBulk && (
+                                <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  Bulk ({d.items.length})
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {new Date(d.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                            </p>
+                          </div>
                         </div>
                         <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
                           {statusInfo.isProcessing && (
@@ -289,17 +307,37 @@ export default function HistoryPage() {
                             </span>
                           </td>
                           <td className="py-4 px-5">
-                            <span className="font-bold text-foreground">
-                              {d.providerSlug}
-                              {d.isBulk && (
-                                <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Bulk ({d.items.length})
+                            <div className="flex items-center gap-3">
+                              <div className="w-20 h-9 bg-white rounded-lg flex items-center justify-center px-2 shrink-0">
+                                <img
+                                  src={`/provider-logos/png/${d.providerSlug}.png`}
+                                  alt={d.providerSlug}
+                                  className="h-6 w-full object-contain"
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.triedSvg) {
+                                      img.dataset.triedSvg = "1";
+                                      img.src = `/provider-logos/${d.providerSlug}.svg`;
+                                    } else {
+                                      img.style.display = "none";
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-bold text-foreground">
+                                  {d.providerSlug}
+                                  {d.isBulk && (
+                                    <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                      Bulk ({d.items.length})
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            {!d.isBulk && d.fileName && (
-                              <p className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">{d.fileName}</p>
-                            )}
+                                {!d.isBulk && d.fileName && (
+                                  <p className="text-xs text-muted-foreground truncate max-w-[180px] mt-0.5">{d.fileName}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-4 px-5">
                             <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
