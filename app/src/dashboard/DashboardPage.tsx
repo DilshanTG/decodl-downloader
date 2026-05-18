@@ -1200,7 +1200,7 @@ export default function DashboardPage() {
                       <div className="flex gap-2 shrink-0">
                         {!download.isBulk && download.status === "completed" && download.downloadUrl && (
                           <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3 animate-in fade-in zoom-in-95 duration-300">
-                            <a href={`https://stockmart-production.up.railway.app/api/download-file/${download.id}`} download>
+                            <a href={`https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${download.id}`} target="_blank" rel="noopener noreferrer">
                               ↓ Download
                             </a>
                           </Button>

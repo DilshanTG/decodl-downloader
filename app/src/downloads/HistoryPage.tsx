@@ -10,9 +10,7 @@ import { Button } from "../client/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../client/components/ui/card";
 
 function getDownloadUrl(downloadId: string) {
-  const base = import.meta.env.REACT_APP_API_URL || window.location.origin.replace(':3000', ':3001');
-  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-  return `${cleanBase}/api/download-file/${downloadId}`;
+  return `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
 }
 
 const STATUS_FILTERS = [

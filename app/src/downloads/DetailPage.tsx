@@ -12,9 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../cl
 const TERMINAL_STATUSES = new Set(["completed", "failed", "refunded"]);
 
 function getDownloadUrl(downloadId: string) {
-  const base = import.meta.env.REACT_APP_API_URL || window.location.origin.replace(':3000', ':3001');
-  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-  return `${cleanBase}/api/download-file/${downloadId}`;
+  return `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
 }
 
 const TIMELINE_STEPS = [
