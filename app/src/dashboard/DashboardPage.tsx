@@ -87,18 +87,19 @@ export default function DashboardPage() {
   const detectedSlug = isUrlMode
     ? (url.length > 5 ? detectProvider(url) : null)
     : (manuallySelectedProvider || null);
-  const [pollInterval, setPollInterval] = useState<number | false>(5000);
+  const [pollInterval, setPollInterval] = useState<number | false>(2000);
 
   const {
     data: downloadsData,
     isLoading: downloadsLoading,
+    refetch: refetchDownloads,
   } = useQuery(getMyDownloads, { page: 1 }, { refetchInterval: pollInterval });
 
   const {
     data: balanceData,
     isLoading: balanceLoading,
     refetch: refetchBalance,
-  } = useQuery(getMyCreditBalance, undefined, { refetchInterval: 10000 });
+  } = useQuery(getMyCreditBalance, undefined, { refetchInterval: 3000 });
 
   const { data: pricingData } = useQuery(getProviderPricing, undefined);
 
@@ -116,12 +117,15 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!downloadsData?.downloads?.length) return;
-    const allTerminal = downloadsData.downloads
-      .slice(0, 5)
-      .every((d: any) => TERMINAL_STATUSES.has(d.status));
-    if (allTerminal) setPollInterval(false);
-    else setPollInterval(5000);
+    if (!downloadsData?.downloads?.length) {
+      setPollInterval(false);
+      return;
+    }
+    const hasActive = downloadsData.downloads
+      .slice(0, 10)
+      .some((d: any) => !TERMINAL_STATUSES.has(d.status));
+    // 2s polling when any download is active, stop completely when all done
+    setPollInterval(hasActive ? 2000 : false);
   }, [downloadsData]);
 
   useEffect(() => {
@@ -276,7 +280,8 @@ export default function DashboardPage() {
 
     setBulkUrls("");
     setBulkSubmitting(false);
-    setPollInterval(5000);
+    setPollInterval(2000);
+    refetchDownloads();
     refetchBalance();
 
     toast({
@@ -322,7 +327,9 @@ export default function DashboardPage() {
       setManuallySelectedProvider("");
       setSelectedVariant("normal");
       setSelectedFormat("");
-      setPollInterval(5000);
+      setPollInterval(2000);
+      // Immediately fetch to show the new download without waiting for poll
+      refetchDownloads();
       refetchBalance();
       toast({
         title: "Download submitted!",
@@ -1001,17 +1008,21 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {recentDownloads.map((download: any) => {
+                {recentDownloads.map((download: any, idx: number) => {
                   const statusInfo = download.isBulk
                     ? getBatchStatusText(download.items)
                     : {
                         text: DOWNLOAD_STATUS_LABELS[download.status] || download.status,
                         colorClass: DOWNLOAD_STATUS_COLORS[download.status] || "bg-muted text-foreground",
-                        isProcessing: download.status === "processing"
+                        isProcessing: download.status === "processing" || download.status === "pending"
                       };
 
                   return (
-                    <div key={download.id} className="flex items-center gap-4 py-4 group">
+                    <div
+                      key={download.id}
+                      className="flex items-center gap-4 py-4 group animate-in fade-in slide-in-from-top-2 duration-300"
+                      style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}
+                    >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-foreground truncate">
                           {download.providerSlug}
@@ -1031,7 +1042,10 @@ export default function DashboardPage() {
                           })}
                         </p>
                       </div>
-                      <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
+                      <span
+                        key={statusInfo.text}
+                        className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-300 animate-in fade-in zoom-in-95 ${statusInfo.colorClass}`}
+                      >
                         {statusInfo.isProcessing && (
                           <svg className="animate-spin -ml-0.5 mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -1043,15 +1057,15 @@ export default function DashboardPage() {
                       <span className="text-xs text-muted-foreground font-bold tabular-nums w-14 text-right shrink-0">
                         {download.creditsCharged ? `${download.creditsCharged.toFixed(1)} cr` : "—"}
                       </span>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div className="flex gap-2 shrink-0">
                         {!download.isBulk && download.status === "completed" && download.downloadUrl && (
-                          <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3">
-                            <a href={download.downloadUrl} target="_blank" rel="noopener noreferrer">
-                              Download
+                          <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3 animate-in fade-in zoom-in-95 duration-300">
+                            <a href={`https://stockmart-production.up.railway.app/api/download-file/${download.id}`} download>
+                              ↓ Download
                             </a>
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" asChild className="h-8 rounded-lg text-xs font-semibold px-3 border-border">
+                        <Button size="sm" variant="outline" asChild className="h-8 rounded-lg text-xs font-semibold px-3 border-border opacity-50 hover:opacity-100 transition-opacity">
                           <Link to={routes.DownloadDetailRoute.build({ params: { id: download.id } }) as any}>
                             Details
                           </Link>
