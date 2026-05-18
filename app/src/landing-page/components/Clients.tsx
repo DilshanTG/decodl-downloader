@@ -1,29 +1,76 @@
-export default function Clients() {
-  const providers = [
-    { name: "Shutterstock", color: "text-red-500 dark:text-red-400" },
-    { name: "Freepik", color: "text-cyan-500 dark:text-cyan-400" },
-    { name: "Adobe Stock", color: "text-red-600 dark:text-red-500" },
-    { name: "Envato Elements", color: "text-green-500 dark:text-green-400" },
-    { name: "iStock Photo", color: "text-blue-500 dark:text-blue-400" },
-    { name: "Flaticon", color: "text-indigo-500 dark:text-indigo-400" },
-  ];
+const PROVIDERS_ROW1 = [
+  { slug: "shutterstock",       label: "Shutterstock" },
+  { slug: "adobestock",         label: "Adobe Stock" },
+  { slug: "freepik",            label: "Freepik" },
+  { slug: "envato_elements",    label: "Envato Elements" },
+  { slug: "flaticon",           label: "Flaticon" },
+  { slug: "istockphoto",        label: "iStock" },
+  { slug: "depositphotos",      label: "Depositphotos" },
+];
 
+const PROVIDERS_ROW2 = [
+  { slug: "dreamstime",         label: "Dreamstime" },
+  { slug: "alamy",              label: "Alamy" },
+  { slug: "123rf",              label: "123RF" },
+  { slug: "yellowimages",       label: "Yellow Images" },
+  { slug: "shutterstock_video", label: "Shutterstock Video" },
+  { slug: "istockphoto_video",  label: "iStock Video" },
+  { slug: "adobestock_video",   label: "Adobe Stock Video" },
+];
+
+function ProviderLogo({ slug, label }: { slug: string; label: string }) {
   return (
-    <div className="mx-auto mt-20 flex max-w-7xl flex-col items-center gap-y-6 px-6 lg:px-8">
-      <h2 className="text-muted-foreground text-center text-xs uppercase font-bold tracking-widest">
-        SUPPORTED PREMIUM ASSET PROVIDERS:
-      </h2>
+    <div className="group flex items-center justify-center mx-8 w-36 shrink-0">
+      <img
+        src={`/provider-logos/${slug}.svg`}
+        alt={label}
+        title={label}
+        className="h-12 w-full object-contain opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-300"
+        onError={(e) => {
+          const el = e.currentTarget;
+          el.style.display = "none";
+          const fallback = el.nextElementSibling as HTMLElement | null;
+          if (fallback) fallback.style.display = "block";
+        }}
+      />
+      <span className="hidden text-xs font-bold text-muted-foreground/60">{label}</span>
+    </div>
+  );
+}
 
-      <div className="mx-auto flex flex-wrap items-center justify-center gap-x-12 gap-y-8 max-w-4xl">
-        {providers.map((p) => (
-          <div
-            key={p.name}
-            className="flex items-center justify-center font-extrabold text-xl md:text-2xl tracking-tight opacity-60 dark:opacity-50 grayscale contrast-125 transition-all duration-300 hover:opacity-100 hover:grayscale-0 cursor-default"
-          >
-            <span className={p.color}>{p.name}</span>
-          </div>
+function MarqueeRow({ providers, reverse = false }: { providers: typeof PROVIDERS_ROW1; reverse?: boolean }) {
+  const doubled = [...providers, ...providers];
+  return (
+    <div className="relative flex overflow-hidden">
+      <div
+        className={`flex items-center animate-marquee ${reverse ? "animate-marquee-reverse" : ""}`}
+        style={{ willChange: "transform" }}
+      >
+        {doubled.map((p, i) => (
+          <ProviderLogo key={`${p.slug}-${i}`} slug={p.slug} label={p.label} />
         ))}
       </div>
     </div>
+  );
+}
+
+export default function Clients() {
+  return (
+    <section className="py-16 border-y border-border/50 bg-card/20 overflow-hidden">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8 mb-8">
+        <p className="text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Download from 20+ premium asset providers
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        <MarqueeRow providers={PROVIDERS_ROW1} />
+        <MarqueeRow providers={PROVIDERS_ROW2} reverse />
+      </div>
+
+      {/* Fade edges */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent" />
+    </section>
   );
 }

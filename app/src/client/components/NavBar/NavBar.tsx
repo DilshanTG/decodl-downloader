@@ -2,6 +2,8 @@ import { LogIn, Menu } from "lucide-react";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { Link as ReactRouterLink } from "react-router";
 import { useAuth } from "wasp/client/auth";
+import { useQuery } from "wasp/client/operations";
+import { getMyCreditBalance } from "wasp/client/operations";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
 import {
   Sheet,
@@ -96,6 +98,35 @@ export default function NavBar({
   );
 }
 
+function NavBarCreditSection({ isScrolled }: { isScrolled: boolean }) {
+  const { data: balanceData } = useQuery(getMyCreditBalance);
+  const creditBalance = balanceData?.available ?? (balanceData as any)?.credits ?? 0;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={cn("flex items-center gap-1", isScrolled ? "text-xs" : "text-sm")}>
+        <span className="text-muted-foreground font-medium">Balance:</span>
+        <span className="font-black text-primary tabular-nums">
+          {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
+          <span className="text-xs font-bold text-muted-foreground ml-0.5">cr</span>
+        </span>
+      </div>
+      <WaspRouterLink
+        to={routes.PricingPageRoute.to}
+        className={cn(
+          "flex items-center gap-1 rounded-lg font-bold bg-primary text-primary-foreground transition-opacity hover:opacity-90",
+          isScrolled ? "text-xs px-2.5 py-1" : "text-xs px-3 py-1.5",
+        )}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+        </svg>
+        Buy Credits
+      </WaspRouterLink>
+    </div>
+  );
+}
+
 function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
   const { data: user, isLoading: isUserLoading } = useAuth();
 
@@ -127,7 +158,8 @@ function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
           </div>
         </WaspRouterLink>
       ) : (
-        <div className="ml-3">
+        <div className="ml-3 flex items-center gap-3">
+          <NavBarCreditSection isScrolled={isScrolled} />
           <UserDropdown user={user} />
         </div>
       )}
@@ -186,12 +218,17 @@ function NavBarMobileMenu({
                     </div>
                   </WaspRouterLink>
                 ) : (
-                  <ul className="space-y-2">
-                    <UserMenuItems
-                      user={user}
-                      onItemClick={() => setMobileMenuOpen(false)}
-                    />
-                  </ul>
+                  <>
+                    <div className="mb-4 pb-4 border-b border-border">
+                      <NavBarCreditSection isScrolled={false} />
+                    </div>
+                    <ul className="space-y-2">
+                      <UserMenuItems
+                        user={user}
+                        onItemClick={() => setMobileMenuOpen(false)}
+                      />
+                    </ul>
+                  </>
                 )}
               </div>
               <div className="py-6">
@@ -236,6 +273,6 @@ const NavLogo = ({ isScrolled }: { isScrolled: boolean }) => (
   <img
     src="/stockmart-logo.svg"
     alt="StockMart.lk"
-    className={cn("transition-all duration-300 object-contain", isScrolled ? "h-7" : "h-9")}
+    className={cn("transition-all duration-300 object-contain", isScrolled ? "h-10" : "h-14")}
   />
 );

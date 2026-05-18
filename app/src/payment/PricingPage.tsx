@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "wasp/client/auth";
-import { createPayherePayment } from "wasp/client/operations";
+import { createPayherePayment, getProviderPricing } from "wasp/client/operations";
+import { useQuery } from "wasp/client/operations";
 import { Link, routes } from "wasp/client/router";
+import type { ProviderPricing } from "wasp/entities";
 import { CREDIT_PACKAGES } from "../shared/constants";
 import {
   Accordion,
@@ -11,7 +13,7 @@ import {
 } from "../client/components/ui/accordion";
 import { useToast } from "../client/hooks/use-toast";
 import { Button } from "../client/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../client/components/ui/card";
+import { Card, CardContent, CardHeader } from "../client/components/ui/card";
 
 const FAQS = [
   {
@@ -40,22 +42,77 @@ const FAQS = [
   },
 ];
 
-const PROVIDER_COSTS: Array<{ provider: string; cost: string }> = [
-  { provider: "Shutterstock (Image)", cost: "1 credit" },
-  { provider: "Freepik (Image/Vector)", cost: "0.5 credits" },
-  { provider: "Adobe Stock (Image)", cost: "1 credit" },
-  { provider: "Envato Elements", cost: "1 credit" },
-  { provider: "iStock (Image)", cost: "1.5 credits" },
-  { provider: "Flaticon", cost: "0.2 credits" },
-  { provider: "Shutterstock (Video HD)", cost: "65 credits" },
-  { provider: "Adobe Stock (Video)", cost: "30 credits" },
-  { provider: "Motion Array", cost: "1 credit" },
-];
+const CATEGORY_LABELS: Record<string, string> = {
+  image: "Images & Vectors",
+  icon:  "Icons & UI Assets",
+  video: "Video Footage",
+};
+
+function ProviderLogoCard({ slug, name, minCost, maxCost }: {
+  slug: string; name: string; minCost: number; maxCost: number;
+}) {
+  const costLabel = minCost === 0
+    ? "Free"
+    : minCost === maxCost
+    ? `${minCost} cr`
+    : `from ${minCost} cr`;
+
+  return (
+    <div className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 group">
+      <div className="w-full h-12 flex items-center justify-center">
+        <img
+          src={`/provider-logos/png/${slug}.png`}
+          alt={name}
+          className="h-10 w-full object-contain"
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (!img.dataset.triedSvg) {
+              img.dataset.triedSvg = "1";
+              img.src = `/provider-logos/${slug}.svg`;
+            } else {
+              img.style.display = "none";
+              const fb = img.nextElementSibling as HTMLElement | null;
+              if (fb) fb.style.display = "flex";
+            }
+          }}
+        />
+        <span className="hidden w-full h-10 items-center justify-center text-xs font-bold text-muted-foreground/70 bg-muted/40 rounded-lg">
+          {name}
+        </span>
+      </div>
+      <span className="text-xs font-extrabold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+        {costLabel}
+      </span>
+    </div>
+  );
+}
 
 export default function PricingPage() {
   const { data: user } = useAuth();
   const { toast } = useToast();
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
+  const { data: pricingData } = useQuery(getProviderPricing);
+
+  // Build per-slug min/max cost, grouped by category (exclude lorempicsum test provider)
+  const providerGroups = (() => {
+    if (!pricingData) return {} as Record<string, { slug: string; name: string; minCost: number; maxCost: number }[]>;
+    const map: Record<string, { slug: string; name: string; category: string; minCost: number; maxCost: number }> = {};
+    for (const p of pricingData as ProviderPricing[]) {
+      if (p.slug === "lorempicsum") continue;
+      if (!map[p.slug]) {
+        map[p.slug] = { slug: p.slug, name: p.displayName.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| VIP.*$/, ""), category: p.category, minCost: p.creditCost, maxCost: p.creditCost };
+      } else {
+        map[p.slug].minCost = Math.min(map[p.slug].minCost, p.creditCost);
+        map[p.slug].maxCost = Math.max(map[p.slug].maxCost, p.creditCost);
+      }
+    }
+    const groups: Record<string, { slug: string; name: string; minCost: number; maxCost: number }[]> = {};
+    for (const v of Object.values(map)) {
+      if (!groups[v.category]) groups[v.category] = [];
+      groups[v.category].push({ slug: v.slug, name: v.name, minCost: v.minCost, maxCost: v.maxCost });
+    }
+    return groups;
+  })();
 
   const handleBuy = async (packageId: string) => {
     if (!user) {
@@ -252,26 +309,115 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Credit cost per provider */}
-        <Card className="border border-border p-6 mb-20 bg-card shadow-md" variant="bento">
-          <h2 className="text-xl font-bold tracking-tight mb-5 text-foreground">
-            Credit Cost by Provider
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {PROVIDER_COSTS.map((item) => (
-              <div
-                key={item.provider}
-                className="flex items-center justify-between px-4 py-3 bg-accent/40 border border-border rounded-xl"
-              >
-                <span className="text-sm font-medium text-foreground">{item.provider}</span>
-                <span className="text-sm font-extrabold text-primary">{item.cost}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Exact credit costs are shown before every download. Some file types (like high-offset Shutterstock files or 4K videos) may cost more.
+        {/* Credit cost per provider — logo grid */}
+        <div className="mb-20">
+          <h2 className="text-2xl font-bold tracking-tight text-center mb-2">Supported Providers</h2>
+          <p className="text-sm text-muted-foreground text-center mb-10">
+            Credit costs are shown before every download. Some variants (4K video, offset images) cost more.
           </p>
-        </Card>
+
+          {(["image", "icon", "video"] as const).map((cat) => {
+            const providers = providerGroups[cat];
+            if (!providers?.length) return null;
+            return (
+              <div key={cat} className="mb-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {CATEGORY_LABELS[cat]}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {providers.map((p) => (
+                    <ProviderLogoCard
+                      key={p.slug}
+                      slug={p.slug}
+                      name={p.name}
+                      minCost={p.minCost}
+                      maxCost={p.maxCost}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Full credit cost breakdown table */}
+        <div className="mb-20">
+          <h2 className="text-2xl font-bold tracking-tight text-center mb-2">Full Credit Cost Breakdown</h2>
+          <p className="text-sm text-muted-foreground text-center mb-10">
+            Exact deduction per download, by provider and file type.
+          </p>
+
+          {(["image", "icon", "video"] as const).map((cat) => {
+            const rows = (pricingData as ProviderPricing[] | undefined)
+              ?.filter(p => p.category === cat && p.slug !== "lorempicsum")
+              .sort((a, b) => a.sortOrder - b.sortOrder);
+            if (!rows?.length) return null;
+
+            return (
+              <div key={cat} className="mb-8">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {CATEGORY_LABELS[cat]}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <Card className="border border-border overflow-hidden shadow-sm" variant="bento">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/40">
+                          <th className="text-left py-3 px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground w-10"></th>
+                          <th className="text-left py-3 px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Provider</th>
+                          <th className="text-left py-3 px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Type / Variant</th>
+                          <th className="text-right py-3 px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Credits</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {rows.map((p) => (
+                          <tr key={`${p.slug}-${p.variant}`} className="hover:bg-accent/20 transition-colors">
+                            <td className="py-3 px-4">
+                              <img
+                                src={`/provider-logos/png/${p.slug}.png`}
+                                alt={p.displayName}
+                                className="h-7 w-10 object-contain"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  if (!img.dataset.triedSvg) {
+                                    img.dataset.triedSvg = "1";
+                                    img.src = `/provider-logos/${p.slug}.svg`;
+                                  } else {
+                                    img.style.display = "none";
+                                  }
+                                }}
+                              />
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-foreground">{p.displayName.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| Select$| HD Select$| 4K Select$/, "")}</td>
+                            <td className="py-3 px-4 text-muted-foreground capitalize">
+                              {p.variant === "normal" ? "Standard" : p.variant.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <span className={`inline-block font-extrabold text-sm px-2.5 py-0.5 rounded-full ${
+                                p.creditCost === 0 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                                p.creditCost <= 1 ? "bg-primary/10 text-primary" :
+                                p.creditCost <= 5 ? "bg-secondary/10 text-secondary" :
+                                "bg-destructive/10 text-destructive"
+                              }`}>
+                                {p.creditCost} cr
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+            );
+          })}
+        </div>
 
         {/* FAQ */}
         <div className="max-w-3xl mx-auto mb-16">

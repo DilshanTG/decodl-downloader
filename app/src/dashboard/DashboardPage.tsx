@@ -24,6 +24,8 @@ function detectProvider(url: string): string | null {
   if (/shutterstock\.com/.test(url)) return "shutterstock";
   if (/stock\.adobe\.com\/video/.test(url)) return "adobestock_video";
   if (/stock\.adobe\.com/.test(url)) return "adobestock";
+  if (/magnific\.com\/free-video/.test(url)) return "magnific_video";
+  if (/magnific\.com/.test(url)) return "magnific";
   if (/freepik\.com\/video/.test(url)) return "freepik_video";
   if (/freepik\.com/.test(url)) return "freepik";
   if (/flaticon\.com/.test(url)) return "flaticon";
@@ -111,10 +113,14 @@ export default function DashboardPage() {
   const [liveInfo, setLiveInfo] = useState<{
     calculatedCost: number;
     ratio: number;
-    options: Array<{ name: string; values: string[] }>;
+    options: Array<{ name: string; values: string[]; defaultValue?: string }>;
     error?: string;
   } | null>(null);
   const [liveInfoLoading, setLiveInfoLoading] = useState(false);
+  const [assetError, setAssetError] = useState<{
+    type: "not-found" | "not-supported" | "no-package" | "error";
+    message: string;
+  } | null>(null);
   const [selectedFormat, setSelectedFormat] = useState("");
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");
   const [bulkUrls, setBulkUrls] = useState("");
@@ -220,14 +226,21 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!url.trim()) {
       setLiveInfo(null);
+      setAssetError(null);
       setSelectedFormat("");
       return;
     }
 
     const delayDebounceFn = setTimeout(async () => {
-      if (!detectedSlug) return;
+      if (!detectedSlug) {
+        setLiveInfo(null);
+        setAssetError(null);
+        return;
+      }
 
       setLiveInfoLoading(true);
+      setAssetError(null);
+
       try {
         const payload: any = {};
         if (isUrlMode) {
@@ -244,15 +257,33 @@ export default function DashboardPage() {
 
         const info = await getAssetInfo(payload);
         setLiveInfo(info);
-        
+        setAssetError(null);
+
         if (info.options?.length > 0 && !selectedFormat) {
           const formatOpt = info.options.find((opt: any) => opt.name === 'format');
           if (formatOpt?.values?.length > 0) {
-            setSelectedFormat(formatOpt.values[0]);
+            setSelectedFormat(formatOpt.defaultValue || formatOpt.values[0]);
           }
         }
-      } catch (err) {
-        console.error("Live info error:", err);
+      } catch (err: any) {
+        setLiveInfo(null);
+        const msg = (err?.message || "").toLowerCase();
+        const exCode = err?.exceptionCode;
+        const decodlCode = err?.code;
+
+        if (msg.includes("not-found") || msg.includes("not found") || exCode === 404005) {
+          setAssetError({ type: "not-found", message: "This asset doesn't exist or the URL is incorrect. Double-check the link and try again." });
+        } else if (
+          msg.includes("not-supported") || msg.includes("not supported") ||
+          msg.includes("editorial") || msg.includes("only support") ||
+          msg.includes("not support") || decodlCode === 400024
+        ) {
+          setAssetError({ type: "not-supported", message: "This asset type is not supported for download. It may be editorial, a video-only link on an image provider, or a format we don't support." });
+        } else if (msg.includes("no-package") || msg.includes("no package")) {
+          setAssetError({ type: "no-package", message: "API service issue on our end. Please try again in a few minutes. If this persists, contact support." });
+        } else {
+          setAssetError({ type: "error", message: err?.message || "Could not verify this asset. Please check the URL and try again." });
+        }
       } finally {
         setLiveInfoLoading(false);
       }
@@ -267,17 +298,6 @@ export default function DashboardPage() {
       ) || (pricingData as ProviderPricing[]).find((p) => p.slug === detectedSlug)
     : null;
 
-  const isVideoProvider = detectedSlug?.includes("_video") || false;
-  const baseSlug = detectedSlug?.replace("_video", "") || null;
-
-  const hdPricing = baseSlug && pricingData
-    ? (pricingData as ProviderPricing[]).find((p) => p.slug === `${baseSlug}_video` && p.variant === "hd")
-    : null;
-  const fourKPricing = baseSlug && pricingData
-    ? (pricingData as ProviderPricing[]).find((p) => p.slug === `${baseSlug}_video` && p.variant === "4k")
-    : null;
-
-  const hasVideoOptions = hdPricing || fourKPricing;
   const creditBalance  = balanceData?.available  ?? balanceData?.credits ?? (user?.credits ?? 0) - (user?.reservedCredits ?? 0);
   const reservedAmount = balanceData?.reservedCredits ?? user?.reservedCredits ?? 0;
   const rawDownloads = downloadsData?.downloads ?? [];
@@ -481,16 +501,6 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              {!balanceLoading && (
-                <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Balance</span>
-                  <span className="text-2xl font-black text-primary tabular-nums">
-                    {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
-                    <span className="text-sm font-bold text-muted-foreground ml-1">cr</span>
-                  </span>
-                </div>
-              )}
-
               {/* Notification bell */}
               <div className="relative">
                 <button
@@ -541,14 +551,6 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <Button size="sm" variant="default" asChild className="rounded-xl font-bold shadow-sm shadow-primary/20">
-                <Link to={routes.PricingPageRoute.to}>
-                  <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Buy Credits
-                </Link>
-              </Button>
             </div>
           </div>
         </div>
@@ -576,18 +578,19 @@ export default function DashboardPage() {
               )}
               <p className="text-xs text-muted-foreground mb-1">credits available</p>
               {reservedAmount > 0 && (
-                <p className="text-xs text-amber-500 font-semibold mb-4">
+                <p className="text-xs text-amber-500 font-semibold mb-2">
                   {reservedAmount.toFixed(1)} reserved in active downloads
                 </p>
               )}
-              <Button size="sm" variant="default" asChild className="rounded-xl font-semibold shadow-sm">
-                <Link to={routes.PricingPageRoute.to}>
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Buy More Credits
-                </Link>
-              </Button>
+              <Link
+                to={routes.PricingPageRoute.to}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline mt-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Top up credits
+              </Link>
             </CardContent>
           </Card>
 
@@ -740,88 +743,209 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Provider detection feedback */}
-                {url.trim().length > 0 && (
-                  <div
-                    className={`mb-5 rounded-xl px-4 py-3 text-sm border transition-all duration-200 ${
-                      detectedSlug
-                        ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
-                        : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                    }`}
-                  >
-                    {detectedSlug ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-                        <div className="flex items-center gap-2">
-                          {liveInfoLoading ? (
-                            <svg className="animate-spin w-4.5 h-4.5 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                          <span className="font-bold tracking-wide">
-                            {pricingData?.find((p: any) => p.slug === detectedSlug)?.displayName || detectedSlug} detected
-                          </span>
-                          {liveInfoLoading && (
-                            <span className="text-xs opacity-75 italic">(calculating live cost...)</span>
-                          )}
-                        </div>
-                        
-                        {liveInfo ? (
-                          <div className="flex items-center gap-1.5 bg-green-500/10 dark:bg-green-500/20 border border-green-500/20 px-2.5 py-1 rounded-lg">
-                            <span className="text-xs font-semibold opacity-75 uppercase tracking-widest">Cost:</span>
-                            <span className="font-extrabold text-base">
-                              {liveInfo.calculatedCost} credit{liveInfo.calculatedCost !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                        ) : matchedPricing ? (
-                          <span className="font-extrabold text-base">
-                            {matchedPricing.creditCost} credit{matchedPricing.creditCost !== 1 ? "s" : ""}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4.5 h-4.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span className="font-semibold">Provider not recognized. Ensure you paste a supported link.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ── 3-Step Asset Verification Panel ── */}
+                {url.trim().length > 0 && (() => {
+                  const s1 = detectedSlug ? "success" : url.trim().length > 5 ? "warning" : "idle";
+                  const s2 = s1 !== "success" ? "idle"
+                    : liveInfoLoading ? "loading"
+                    : assetError ? (assetError.type === "not-supported" ? "editorial" : assetError.type === "no-package" ? "warning" : "error")
+                    : liveInfo ? "success"
+                    : "idle";
+                  const assetCost = liveInfo?.calculatedCost ?? matchedPricing?.creditCost;
+                  const s3 = s2 !== "success" || assetCost == null ? "idle"
+                    : creditBalance >= assetCost ? "success" : "warning";
 
-                {/* Dynamic Decodl Format & Option Selector */}
-                {detectedSlug && liveInfo?.options && liveInfo.options.length > 0 && (
-                  <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
-                    {liveInfo.options.map((opt: any) => (
-                      <div key={opt.name} className="flex flex-col gap-2">
-                        <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                          Select Asset {opt.name.charAt(0).toUpperCase() + opt.name.slice(1)} Quality
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={selectedFormat}
-                            onChange={(e) => setSelectedFormat(e.target.value)}
-                            className="w-full border border-border bg-background text-foreground rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-inner appearance-none cursor-pointer pr-10 font-bold"
-                          >
-                            {opt.values.map((val: string) => (
-                              <option key={val} value={val}>
-                                {val.toUpperCase()} Format Quality
-                              </option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                            <svg className="fill-current h-4.5 w-4.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                            </svg>
-                          </div>
-                        </div>
+                  const providerLabel = (pricingData as any[])?.find((p: any) => p.slug === detectedSlug)?.displayName || detectedSlug || "";
+
+                  const Dot = ({ s }: { s: string }) => {
+                    if (s === "loading") return (
+                      <div className="w-8 h-8 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center shrink-0">
+                        <svg className="animate-spin w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
                       </div>
-                    ))}
+                    );
+                    if (s === "success") return (
+                      <div className="w-8 h-8 rounded-full bg-green-500/15 border-2 border-green-500/40 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </div>
+                    );
+                    if (s === "warning" || s === "editorial") return (
+                      <div className="w-8 h-8 rounded-full bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                      </div>
+                    );
+                    if (s === "error" || s === "not-found") return (
+                      <div className="w-8 h-8 rounded-full bg-red-500/15 border-2 border-red-500/40 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </div>
+                    );
+                    return (
+                      <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/>
+                      </div>
+                    );
+                  };
+
+                  const Badge = ({ label, color }: { label: string; color: string }) => (
+                    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${color}`}>
+                      {label}
+                    </span>
+                  );
+
+                  return (
+                    <div className="mb-5 rounded-2xl border border-border bg-card shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+
+                      {/* Step 1 — Provider Detection */}
+                      <div className="flex items-center gap-3.5 px-5 py-4 border-b border-border">
+                        <Dot s={s1} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 1 · Provider</p>
+                          {s1 === "success" && (
+                            <div className="flex items-center gap-2">
+                              <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto object-contain"
+                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                              <span className="text-sm font-bold text-foreground">{providerLabel}</span>
+                            </div>
+                          )}
+                          {s1 === "warning" && <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Unknown provider — paste a supported URL</p>}
+                          {s1 === "idle" && <p className="text-sm text-muted-foreground/50">Detecting provider...</p>}
+                        </div>
+                        {s1 === "success" && <Badge label="Detected" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
+                        {s1 === "warning" && <Badge label="Unknown" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
+                      </div>
+
+                      {/* Step 2 — Asset Verification */}
+                      <div className="flex items-start gap-3.5 px-5 py-4 border-b border-border">
+                        <Dot s={s2} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 2 · Asset Check</p>
+                          {s2 === "idle" && <p className="text-sm text-muted-foreground/50">Waiting for provider detection...</p>}
+                          {s2 === "loading" && <p className="text-sm font-semibold text-primary animate-pulse">Querying asset availability...</p>}
+                          {s2 === "success" && assetCost != null && (
+                            <p className="text-sm font-bold text-foreground">
+                              Available · <span className="text-primary">{assetCost} {assetCost === 1 ? "credit" : "credits"}</span>
+                            </p>
+                          )}
+                          {s2 === "editorial" && (
+                            <div>
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Editorial Content — Cannot Download</p>
+                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                This asset is licensed for editorial/news use only and cannot be downloaded for commercial use via this service.
+                              </p>
+                            </div>
+                          )}
+                          {s2 === "warning" && assetError?.type === "no-package" && (
+                            <div>
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Service Temporarily Unavailable</p>
+                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{assetError.message}</p>
+                            </div>
+                          )}
+                          {s2 === "error" && assetError && (
+                            <div>
+                              <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                                {assetError.type === "not-found" ? "Asset Not Found" : "Verification Failed"}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{assetError.message}</p>
+                            </div>
+                          )}
+                        </div>
+                        {s2 === "success" && assetCost != null && <Badge label={`${assetCost} cr`} color="text-green-600 dark:text-green-400 bg-green-500/10" />}
+                        {s2 === "editorial" && <Badge label="Editorial" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
+                        {(s2 === "warning" && assetError?.type === "no-package") && <Badge label="Unavailable" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
+                        {s2 === "error" && <Badge label={assetError?.type === "not-found" ? "Not Found" : "Error"} color="text-red-600 dark:text-red-400 bg-red-500/10" />}
+                      </div>
+
+                      {/* Step 3 — Credit Check */}
+                      <div className="flex items-start gap-3.5 px-5 py-4">
+                        <Dot s={s3} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Step 3 · Credit Check</p>
+                          {s3 === "idle" && <p className="text-sm text-muted-foreground/50">Waiting for asset verification...</p>}
+                          {s3 === "success" && assetCost != null && (
+                            <p className="text-sm font-bold text-foreground">
+                              Balance OK · <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> remaining after download
+                            </p>
+                          )}
+                          {s3 === "warning" && assetCost != null && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                                Need {assetCost} cr · You have {creditBalance.toFixed(1)} cr
+                              </p>
+                              <Link
+                                to={routes.PricingPageRoute.to}
+                                className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity w-fit"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Buy Credits
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                        {s3 === "success" && <Badge label="Balance OK" color="text-green-600 dark:text-green-400 bg-green-500/10" />}
+                        {s3 === "warning" && <Badge label="Top Up" color="text-amber-600 dark:text-amber-400 bg-amber-500/10" />}
+                      </div>
+
+                    </div>
+                  );
+                })()}
+
+                {/* Dynamic Format Selector — visual cards with per-format credit cost */}
+                {detectedSlug && liveInfo?.options && liveInfo.options.length > 0 && (
+                  <div className="mb-5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {liveInfo.options
+                      .filter((opt: any) => Array.isArray(opt.values) && opt.values.length > 0)
+                      .map((opt: any) => {
+                        const label = opt.name.charAt(0).toUpperCase() + opt.name.slice(1);
+                        return (
+                          <div key={opt.name}>
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                              Select {label} Quality
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {opt.values.map((val: string) => {
+                                const variantPricing = (pricingData as any[])?.find(
+                                  (p: any) => p.slug === detectedSlug && p.variant.toUpperCase() === val.toUpperCase()
+                                );
+                                const variantCost = variantPricing?.creditCost;
+                                const isSelected = selectedFormat === val;
+                                const isDefault = !selectedFormat && val === (opt.defaultValue || opt.values[0]);
+                                const active = isSelected || (!selectedFormat && isDefault);
+                                return (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setSelectedFormat(val)}
+                                    className={`flex flex-col items-center px-5 py-3 rounded-xl border-2 font-bold transition-all duration-200 min-w-[90px] ${
+                                      active
+                                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                                        : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-accent/50"
+                                    }`}
+                                  >
+                                    <span className="text-base font-extrabold tracking-wide">{val.toUpperCase()}</span>
+                                    {variantCost != null ? (
+                                      <span className={`text-xs font-bold mt-0.5 ${active ? "text-primary" : "text-muted-foreground"}`}>
+                                        {variantCost} cr
+                                      </span>
+                                    ) : liveInfoLoading && active ? (
+                                      <span className="text-xs text-muted-foreground mt-0.5">...</span>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
 
@@ -1148,7 +1272,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {recentDownloads.map((download: any, idx: number) => {
+                {recentDownloads.map((download: any) => {
                   const statusInfo = download.isBulk
                     ? getBatchStatusText(download.items)
                     : {

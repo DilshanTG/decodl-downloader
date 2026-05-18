@@ -128,10 +128,21 @@ export interface DecodlSubmitParams {
   options?: Array<{ name: string; value: string }>
 }
 
+// magnific_video is code-only (isCodeNumberOnly:true) — extract trailing numeric ID from URL
+// e.g. magnific.com/free-video/some-description_2891234#... → "2891234"
+function extractMagnificVideoCode(link: string): string | undefined {
+  const match = link.match(/_(\d+)(?:[#?]|$)/)
+  return match ? match[1] : undefined
+}
+
 export async function submitDecodlDownload(params: DecodlSubmitParams): Promise<DecodlSubmitResult> {
   const body: Record<string, any> = {}
 
-  if (params.providerName === 'lorempicsum' || params.link?.includes('picsum') || params.link?.includes('lorempicsum')) {
+  if (params.providerName === 'magnific_video' || params.link?.includes('magnific.com/free-video')) {
+    const code = params.code || (params.link ? extractMagnificVideoCode(params.link) : undefined)
+    body.code = code
+    body.providerName = 'magnific_video'
+  } else if (params.providerName === 'lorempicsum' || params.link?.includes('picsum') || params.link?.includes('lorempicsum')) {
     // For the test provider lorempicsum, Decodl API expects the code and providerName directly
     let code = params.code
     if (params.link) {
@@ -236,6 +247,8 @@ const URL_PATTERNS: Array<{ pattern: RegExp; slug: string }> = [
   { pattern: /shutterstock\.com/, slug: 'shutterstock' },
   { pattern: /stock\.adobe\.com\/video/, slug: 'adobestock_video' },
   { pattern: /stock\.adobe\.com/, slug: 'adobestock' },
+  { pattern: /magnific\.com\/free-video/, slug: 'magnific_video' },
+  { pattern: /magnific\.com/, slug: 'magnific' },
   { pattern: /freepik\.com\/video/, slug: 'freepik_video' },
   { pattern: /freepik\.com/, slug: 'freepik' },
   { pattern: /flaticon\.com/, slug: 'flaticon' },
@@ -267,13 +280,17 @@ export function detectProviderFromUrl(url: string): string | null {
 
 export interface DecodlAssetInfoResult {
   ratio: number
-  options?: Array<{ name: string; values: string[] }>
+  options?: Array<{ name: string; values: string[]; defaultValue?: string }>
 }
 
 export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<DecodlAssetInfoResult> {
   const body: Record<string, any> = {}
 
-  if (params.providerName === 'lorempicsum' || params.link?.includes('picsum') || params.link?.includes('lorempicsum')) {
+  if (params.providerName === 'magnific_video' || params.link?.includes('magnific.com/free-video')) {
+    const code = params.code || (params.link ? extractMagnificVideoCode(params.link) : undefined)
+    body.code = code
+    body.providerName = 'magnific_video'
+  } else if (params.providerName === 'lorempicsum' || params.link?.includes('picsum') || params.link?.includes('lorempicsum')) {
     let code = params.code
     if (params.link) {
       const match = params.link.match(/\/id\/(\d+)/) || params.link.match(/\/(\d+)/)
@@ -300,8 +317,9 @@ export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<De
 
   if (!response.ok) {
     const code = data.code
-    const message = data.message || 'Asset info retrieval failed'
-    throw Object.assign(new Error(message), { statusCode: response.status, code })
+    const exceptionCode = data.data?.exceptionCode
+    const message = scrubDecodlBrand(data.message || 'Asset info retrieval failed')
+    throw Object.assign(new Error(message), { statusCode: response.status, code, exceptionCode })
   }
 
   // Picsum sandbox mock responses to simulate standard image formats
@@ -312,8 +330,22 @@ export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<De
     }
   }
 
+  // Normalize options: API can return either {values: string[]} or {items: [{name,value}]}
+  const rawOptions: any[] = Array.isArray(data.options) ? data.options : [];
+  const normalizedOptions = rawOptions
+    .map((opt: any) => ({
+      name: opt.name,
+      defaultValue: opt.defaultValue,
+      values: Array.isArray(opt.values)
+        ? opt.values
+        : Array.isArray(opt.items)
+          ? opt.items.map((item: any) => item.value ?? item.name)
+          : [],
+    }))
+    .filter((opt) => opt.values.length > 0);
+
   return {
     ratio: typeof data.ratio === 'number' ? data.ratio : parseFloat(String(data.ratio)) || 1.0,
-    options: data.options || undefined,
+    options: normalizedOptions.length > 0 ? normalizedOptions : undefined,
   }
 }

@@ -2,9 +2,15 @@ import { useState } from "react";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
 import { Button } from "../../client/components/ui/button";
 
-const PROVIDERS = [
-  "Shutterstock", "Freepik", "Adobe Stock", "Envato Elements",
-  "iStock", "Flaticon", "Vecteezy", "Depositphotos",
+const PROVIDER_PILLS = [
+  { slug: "shutterstock",    label: "Shutterstock" },
+  { slug: "freepik",         label: "Freepik" },
+  { slug: "adobestock",      label: "Adobe Stock" },
+  { slug: "envato_elements", label: "Envato Elements" },
+  { slug: "istockphoto",     label: "iStock" },
+  { slug: "flaticon",        label: "Flaticon" },
+  { slug: "depositphotos",   label: "Depositphotos" },
+  { slug: "alamy",           label: "Alamy" },
 ];
 
 export default function Hero() {
@@ -82,12 +88,17 @@ export default function Hero() {
 
         {/* Provider Pills */}
         <div className="mt-12 flex flex-wrap justify-center gap-2">
-          {PROVIDERS.map(p => (
-            <span key={p} className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors">
-              {p}
+          {PROVIDER_PILLS.map(p => (
+            <span key={p.slug} title={p.label} className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 hover:border-primary/40 hover:bg-accent/50 transition-colors">
+              <img
+                src={`/provider-logos/${p.slug}.svg`}
+                alt={p.label}
+                className="h-5 w-auto object-contain"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
             </span>
           ))}
-          <span className="rounded-full border border-dashed border-border px-3 py-1 text-xs font-semibold text-muted-foreground/60">
+          <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground/60">
             +12 more
           </span>
         </div>

@@ -279,16 +279,26 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
   try {
     const info = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
 
-    const pricing = await context.entities.ProviderPricing.findFirst({
-      where: { slug: resolvedSlug, isActive: true },
-    })
+    // For providers with format variants (video HD/4K), look up the variant-specific price.
+    // The format option value maps directly to the DB variant name (e.g. "HD" → variant "HD").
+    const formatOption = (options as Array<{ name: string; value: string }>).find(o => o.name === 'format')
+    const pricing = formatOption
+      ? (await context.entities.ProviderPricing.findFirst({
+          where: { slug: resolvedSlug, variant: formatOption.value, isActive: true },
+        }) ?? await context.entities.ProviderPricing.findFirst({
+          where: { slug: resolvedSlug, isActive: true },
+          orderBy: { creditCost: 'asc' },
+        }))
+      : await context.entities.ProviderPricing.findFirst({
+          where: { slug: resolvedSlug, isActive: true },
+          orderBy: { creditCost: 'asc' },
+        })
 
     const ourCost    = pricing ? pricing.creditCost : 1.0
-    const decodlCost = info.ratio  // Decodl's actual credit cost for this asset (not a multiplier)
+    const decodlCost = info.ratio  // Decodl's actual credit cost for this exact asset + format
 
-    // Show our price unless Decodl charges more — in that case pass the higher cost to the user.
-    // If decodlCost < ourCost we already profit at ourCost, so show ourCost.
-    // If decodlCost > ourCost Decodl costs us more than we planned, so show decodlCost.
+    // decodlCost is authoritative for the selected format — use it as the floor.
+    // Only apply ourCost if it's higher (we mark up above Decodl's base rate).
     const displayCost = parseFloat(Math.max(ourCost, decodlCost).toFixed(2))
 
     return {
