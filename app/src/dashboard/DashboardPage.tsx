@@ -1160,8 +1160,7 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={download.id}
-                      className="flex items-center gap-4 py-4 group animate-in fade-in slide-in-from-top-2 duration-300"
-                      style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}
+                      className="flex items-center gap-4 py-4 group"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-foreground truncate">
