@@ -23,7 +23,15 @@ function verifyHmac(body: Record<string, string>, secret: string): boolean {
   const raw = `${merchant_id}${order_id}${amount}${currency}${status_code}${secretHash}`
   const expected = crypto.createHash('md5').update(raw).digest('hex').toUpperCase()
 
-  return md5sig.toUpperCase() === expected
+  // timingSafeEqual prevents byte-by-byte timing attacks that could reveal the HMAC
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(md5sig.toUpperCase(), 'hex'),
+      Buffer.from(expected, 'hex'),
+    )
+  } catch {
+    return false // invalid hex in the incoming signature field
+  }
 }
 
 async function fetchOrderStatus(orderId: string): Promise<string | null> {

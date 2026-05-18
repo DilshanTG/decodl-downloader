@@ -58,7 +58,7 @@ type GetPaginatedUsersOutput = {
 };
 
 const getPaginatorArgsSchema = z.object({
-  skipPages: z.number(),
+  skipPages: z.number().int().min(0),
   filter: z.object({
     emailContains: z.string().nonempty().optional(),
     isAdmin: z.boolean().optional(),

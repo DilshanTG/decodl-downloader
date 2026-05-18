@@ -1,4 +1,4 @@
-import { checkDecodlJobStatus, submitDecodlDownload } from '../decodl/client'
+import { checkDecodlJobStatus, submitDecodlDownload, scrubDecodlBrand } from '../decodl/client'
 
 // ─── Concurrency gate for Decodl submissions ──────────────────────────────────
 // PgBoss worker teamSize isn't configurable via Wasp's DSL, so we implement
@@ -154,7 +154,7 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
         console.log(`[Poll] Download ${download.id} completed — ${download.creditsCharged} credits confirmed.`)
 
       } else if (result.status === 'failed') {
-        await handleDownloadFailure(download, context, result.errorMessage || 'Download failed')
+        await handleDownloadFailure(download, context, scrubDecodlBrand(result.errorMessage || 'Download failed'))
 
       } else {
         // Still processing — update progress + bump lastPolledAt
@@ -173,7 +173,7 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
       console.error(`[Poll] Error checking download ${download.id}:`, err.message)
       await context.entities.Download.update({
         where: { id: download.id },
-        data: { lastPolledAt: new Date(), errorMessage: err.message },
+        data: { lastPolledAt: new Date(), errorMessage: scrubDecodlBrand(err.message || '') },
       })
     }
   }
@@ -208,41 +208,51 @@ async function confirmDownloadCharge(
 ) {
   const cost = download.creditsCharged
 
+  // ── Atomic idempotency guard ───────────────────────────────────────────────
+  // updateMany WHERE status='processing' atomically claims this download.
+  // If pollDecodlJobs fires twice in the same minute (scheduler overlap, restart)
+  // the second call gets count=0 and exits — no double charge ever.
+  // The status+file data write happens HERE, not in a later parallel Promise.all,
+  // so there is no window where Download is 'completed' but credits haven't moved.
+  const claimed = await context.entities.Download.updateMany({
+    where: { id: download.id, status: 'processing' },
+    data: {
+      status: 'completed',
+      downloadUrl: fileData.downloadUrl,
+      fileName: fileData.fileName,
+      fileSize: fileData.fileSize,
+      thumbnailUrl: fileData.thumbnailUrl,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      lastPolledAt: new Date(),
+    },
+  })
+  if (claimed.count === 0) return // already completed by a concurrent worker
+
+  if (cost <= 0) return // zero-cost (admin free retry) — nothing to deduct
+
+  // ── Credit deduction ───────────────────────────────────────────────────────
+  // Use { decrement } not stale absolute values — the reservation made at submit
+  // time guarantees credits >= cost and reservedCredits >= cost here.
+  // Two concurrent calls cannot both reach this point (atomic claim above).
   const user = await context.entities.User.findUnique({ where: { id: download.userId } })
   if (!user) return
 
-  // After confirmation: credits drops by cost, reservedCredits drops by cost.
-  // Available balance (credits - reservedCredits) is unchanged — already showed lower at reserve time.
-  const newCredits = Math.max(0, user.credits - cost)
-  const newReserved = Math.max(0, user.reservedCredits - cost)
-  const newAvailable = newCredits - newReserved
+  const approxAvailable = Math.max(0, user.credits - cost) - Math.max(0, user.reservedCredits - cost)
 
   await Promise.all([
-    context.entities.Download.update({
-      where: { id: download.id },
-      data: {
-        status: 'completed',
-        downloadUrl: fileData.downloadUrl,
-        fileName: fileData.fileName,
-        fileSize: fileData.fileSize,
-        thumbnailUrl: fileData.thumbnailUrl,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        lastPolledAt: new Date(),
-      },
-    }),
     context.entities.User.update({
       where: { id: user.id },
       data: {
-        credits: newCredits,
-        reservedCredits: newReserved,
+        credits:              { decrement: cost },
+        reservedCredits:      { decrement: cost },
         lifetimeCreditsSpent: { increment: cost },
       },
     }),
     context.entities.CreditTransaction.create({
       data: {
         userId: user.id,
-        amount: 0, // visible balance already reduced at reserve time — net 0 here
-        balance: newAvailable,
+        amount: 0, // visible balance unchanged — reservation already reduced it at submit time
+        balance: approxAvailable,
         type: 'download',
         reference: download.id,
         description: `Download confirmed — ${download.providerSlug} (${cost} credit${cost !== 1 ? 's' : ''})`,
@@ -262,29 +272,35 @@ async function confirmDownloadCharge(
 async function handleDownloadFailure(download: any, context: any, errorMessage: string) {
   const cost = download.creditsCharged
 
-  await context.entities.Download.update({
-    where: { id: download.id },
+  // ── Atomic idempotency guard ───────────────────────────────────────────────
+  // Covers 'pending' (called from processDecodlSubmission) and 'processing'
+  // (called from pollDecodlJobs). If the 30-min timeout AND an error response
+  // arrive in the same poll tick, only one call transitions to 'failed' —
+  // preventing reservedCredits being decremented twice (free balance exploit).
+  const claimed = await context.entities.Download.updateMany({
+    where: { id: download.id, status: { notIn: ['completed', 'failed', 'refunded'] } },
     data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
   })
+  if (claimed.count === 0) return // already in a terminal state — skip
 
-  if (cost <= 0) return // nothing was reserved — nothing to release
+  if (cost <= 0) return // zero-cost download — no reservation to release
 
   const user = await context.entities.User.findUnique({ where: { id: download.userId } })
   if (!user) return
 
-  const newReserved = Math.max(0, user.reservedCredits - cost)
-  const newAvailable = user.credits - newReserved
+  // Use { decrement } not stale absolute value — reservation guarantees reservedCredits >= cost
+  const approxAvailable = user.credits - Math.max(0, user.reservedCredits - cost)
 
   await Promise.all([
     context.entities.User.update({
       where: { id: user.id },
-      data: { reservedCredits: newReserved },
+      data: { reservedCredits: { decrement: cost } },
     }),
     context.entities.CreditTransaction.create({
       data: {
         userId: user.id,
         amount: cost, // visible balance goes back up — reservation released
-        balance: newAvailable,
+        balance: approxAvailable,
         type: 'refund',
         reference: download.id,
         description: `Download failed — ${download.providerSlug} reservation released (no charge)`,

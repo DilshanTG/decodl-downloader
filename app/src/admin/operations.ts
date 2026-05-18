@@ -276,6 +276,8 @@ export const adminAdjustUserCredits: AdminAdjustUserCredits<
   requireAdmin(context)
   if (!userId || amount === undefined) throw new HttpError(400, 'userId and amount required')
   if (reason?.trim().length === 0) throw new HttpError(400, 'Reason is required')
+  if (!Number.isFinite(amount)) throw new HttpError(400, 'Amount must be a finite number.')
+  if (Math.abs(amount) > 10_000) throw new HttpError(400, 'Adjustment amount cannot exceed ±10,000 credits per operation.')
 
   const adminUser = context.user!
   const user = await prisma.user.findUnique({ where: { id: userId } })
@@ -323,6 +325,8 @@ export const adminUpdateProviderPricing: AdminUpdateProviderPricing<
   requireAdmin(context)
   if (!id) throw new HttpError(400, 'Provider ID required')
 
+  if (creditCost !== undefined && creditCost < 0) throw new HttpError(400, 'Credit cost cannot be negative.')
+
   const data: any = {}
   if (creditCost !== undefined) data.creditCost = creditCost
   if (isActive !== undefined) data.isActive = isActive
@@ -347,6 +351,10 @@ export const adminForceRetryDownload: AdminForceRetryDownload<
   const download = await prisma.download.findUnique({ where: { id: downloadId } })
   if (!download) throw new HttpError(404, 'Download not found')
 
+  // Set creditsCharged=0 so confirmDownloadCharge skips deduction (cost <= 0 guard).
+  // The original credits were already released when the download failed.
+  // Without this, confirmDownloadCharge would do credits -= cost with no matching
+  // reservation, permanently corrupting the user's reservedCredits balance.
   await prisma.download.update({
     where: { id: downloadId },
     data: {
@@ -354,6 +362,7 @@ export const adminForceRetryDownload: AdminForceRetryDownload<
       errorMessage: null,
       decodlJobId: null,
       lastPolledAt: null,
+      creditsCharged: 0,
     },
   })
 

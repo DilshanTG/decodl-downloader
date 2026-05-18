@@ -57,10 +57,22 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
 ) => {
   if (!context.user) throw new HttpError(401)
 
-  // Input length guards
+  // Input validation
   if (link && link.length > 2048) throw new HttpError(400, 'URL is too long.')
   if (code && code.length > 500)  throw new HttpError(400, 'Code is too long.')
   if (options.length > 20)        throw new HttpError(400, 'Too many options provided.')
+  if (link) {
+    try {
+      const parsed = new URL(link)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new HttpError(400, 'Only http:// and https:// URLs are supported.')
+    } catch (e) {
+      if (e instanceof HttpError) throw e
+      throw new HttpError(400, 'Invalid URL format.')
+    }
+  }
+  for (const opt of options) {
+    if (opt.name.length > 100 || opt.value.length > 500) throw new HttpError(400, 'Option name or value is too long.')
+  }
 
   // 1. Detect provider
   let resolvedSlug = providerSlug
@@ -221,10 +233,22 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
 ) => {
   if (!context.user) throw new HttpError(401)
 
-  // Input length guards (same limits as submitDownload)
+  // Input validation (same rules as submitDownload)
   if (link && link.length > 2048) throw new HttpError(400, 'URL is too long.')
   if (code && code.length > 500)  throw new HttpError(400, 'Code is too long.')
   if (options.length > 20)        throw new HttpError(400, 'Too many options provided.')
+  if (link) {
+    try {
+      const parsed = new URL(link)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new HttpError(400, 'Only http:// and https:// URLs are supported.')
+    } catch (e) {
+      if (e instanceof HttpError) throw e
+      throw new HttpError(400, 'Invalid URL format.')
+    }
+  }
+  for (const opt of options) {
+    if (opt.name.length > 100 || opt.value.length > 500) throw new HttpError(400, 'Option name or value is too long.')
+  }
 
   const now = Date.now()
   const key = context.user.id
