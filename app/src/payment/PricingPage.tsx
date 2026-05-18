@@ -387,11 +387,11 @@ export default function PricingPage() {
                         {rows.map((p) => (
                           <tr key={`${p.slug}-${p.variant}`} className="hover:bg-accent/20 transition-colors">
                             <td className="py-3 px-4">
-                              <div className="w-12 h-7 bg-white rounded flex items-center justify-center px-1">
+                              <div className="w-32 h-10 bg-white rounded-lg flex items-center justify-center px-2.5">
                                 <img
                                   src={`/provider-logos/png/${p.slug}.png`}
                                   alt={p.displayName}
-                                  className="h-5 w-full object-contain"
+                                  className="h-7 w-full object-contain"
                                   onError={(e) => {
                                     const img = e.currentTarget;
                                     if (!img.dataset.triedSvg) {
