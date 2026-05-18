@@ -91,6 +91,7 @@ export default function PricingPage() {
   const { data: user } = useAuth();
   const { toast } = useToast();
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
+  const [confirmPackage, setConfirmPackage] = useState<string | null>(null);
   const { data: pricingData } = useQuery(getProviderPricing);
 
   // Build per-slug min/max cost, grouped by category (exclude lorempicsum test provider)
@@ -119,6 +120,13 @@ export default function PricingPage() {
       window.location.href = routes.SignupRoute.to;
       return;
     }
+    // First click — show fee confirmation
+    if (confirmPackage !== packageId) {
+      setConfirmPackage(packageId);
+      return;
+    }
+    // Second click — confirmed, proceed
+    setConfirmPackage(null);
     setLoadingPackage(packageId);
     try {
       const { paymentUrl } = await createPayherePayment({ packageId: packageId as any });
@@ -233,14 +241,16 @@ export default function PricingPage() {
         <div className="mb-4 text-center">
           <h2 className="text-2xl font-bold tracking-tight mb-2">Choose Your Credit Pack</h2>
           <p className="text-sm text-muted-foreground">Buy once, use anytime. Credits never expire.</p>
-          <p className="text-xs text-muted-foreground mt-1 opacity-70">1 credit ≈ Rs. 180 · Most downloads cost 1–3 credits · Prices include 3% card fee</p>
+          <p className="text-xs text-muted-foreground mt-1 opacity-70">1 credit ≈ Rs. 180 · Most downloads cost 1–3 credits</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {CREDIT_PACKAGES.map((pkg) => {
             const isPopular = "popular" in pkg && pkg.popular;
             const badge = "badge" in pkg ? pkg.badge : null;
             const isLoading = loadingPackage === pkg.id;
+            const isConfirming = confirmPackage === pkg.id;
             const savings = "savings" in pkg ? pkg.savings : null;
+            const totalWithFee = Math.round(pkg.priceLKR * 1.03);
 
             return (
               <Card
@@ -269,11 +279,8 @@ export default function PricingPage() {
                   )}
                   <div className="my-2">
                     <span className="text-4xl font-extrabold tracking-tight">
-                      Rs. {Math.round(pkg.priceLKR * 1.03).toLocaleString()}
+                      Rs. {pkg.priceLKR.toLocaleString()}
                     </span>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Rs. {pkg.priceLKR.toLocaleString()} + 3% card fee
-                    </p>
                   </div>
                 </CardHeader>
 
@@ -313,26 +320,51 @@ export default function PricingPage() {
                     </li>
                   </ul>
 
-                  <Button
-                    onClick={() => handleBuy(pkg.id)}
-                    disabled={isLoading}
-                    variant={isPopular ? "default" : "outline"}
-                    className="w-full py-6 rounded-xl font-bold text-sm tracking-wide transition-all shadow-sm"
-                  >
-                    {isLoading ? (
-                      <>
-                        <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                        Redirecting...
-                      </>
-                    ) : user ? (
-                      "Buy Now"
-                    ) : (
-                      "Sign Up to Buy"
-                    )}
-                  </Button>
+                  {isConfirming ? (
+                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-center animate-in fade-in slide-in-from-bottom-1 duration-150">
+                      <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-0.5">
+                        3% card fee applies
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Rs. {pkg.priceLKR.toLocaleString()} + Rs. {(totalWithFee - pkg.priceLKR).toLocaleString()} fee = <strong className="text-foreground">Rs. {totalWithFee.toLocaleString()}</strong>
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmPackage(null)}
+                          className="flex-1 py-2 rounded-lg text-xs font-bold border border-border hover:bg-accent transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleBuy(pkg.id)}
+                          className="flex-1 py-2 rounded-lg text-xs font-bold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                        >
+                          Confirm & Pay
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => handleBuy(pkg.id)}
+                      disabled={isLoading}
+                      variant={isPopular ? "default" : "outline"}
+                      className="w-full py-6 rounded-xl font-bold text-sm tracking-wide transition-all shadow-sm"
+                    >
+                      {isLoading ? (
+                        <>
+                          <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                          Redirecting...
+                        </>
+                      ) : user ? (
+                        "Buy Now"
+                      ) : (
+                        "Sign Up to Buy"
+                      )}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );
