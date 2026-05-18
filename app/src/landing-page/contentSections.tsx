@@ -122,6 +122,8 @@ export const footerNavigation = {
     { name: "Login", href: "/login" },
     { name: "Sign Up", href: "/signup" },
     { name: "Refund Policy", href: "/refund-policy" },
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
   ],
   company: [
     { name: "DigiMart Solutions (Pvt) Ltd", href: "https://digimartsolutions.lk" },

@@ -138,7 +138,7 @@ export default function CreditsPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-1">
           {[
             {
               label: "Current Balance",
@@ -192,6 +192,9 @@ export default function CreditsPage() {
             </Card>
           ))}
         </div>
+        <p className="text-[10px] text-muted-foreground/60 mb-6 text-right">
+          Purchased / Spent / Refunded totals reflect this page only
+        </p>
 
         {/* Filter tabs */}
         <div className="flex gap-2 flex-wrap mb-4">

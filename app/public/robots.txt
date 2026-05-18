@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /account
+Disallow: /dashboard
+Disallow: /history
+Disallow: /credits
 Disallow: /admin
+
+Sitemap: https://stockmart.lk/sitemap.xml

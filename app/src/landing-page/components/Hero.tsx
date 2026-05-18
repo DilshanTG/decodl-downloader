@@ -116,7 +116,7 @@ export default function Hero() {
             <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent" />
 
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-              Paste any stock URL to preview cost
+              Try it — paste any stock URL to preview cost
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <input

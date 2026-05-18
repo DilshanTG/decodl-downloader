@@ -15,6 +15,9 @@ app stockmart {
     "<meta property='og:site_name' content='StockMart.lk' />",
     "<meta property='og:url' content='https://stockmart.lk' />",
     "<meta property='og:description' content='Download premium stock media and pay in LKR. Shutterstock, Freepik, Adobe Stock and more.' />",
+    "<meta property='og:image' content='https://stockmart.lk/public-banner.webp' />",
+    "<meta name='twitter:card' content='summary_large_image' />",
+    "<meta name='twitter:image' content='https://stockmart.lk/public-banner.webp' />",
   ],
 
   auth: {
@@ -354,6 +357,16 @@ page AdminSettingsPage {
 route RefundPolicyRoute { path: "/refund-policy", to: RefundPolicyPage }
 page RefundPolicyPage {
   component: import RefundPolicyPage from "@src/legal/RefundPolicyPage"
+}
+
+route PrivacyRoute { path: "/privacy", to: PrivacyPage }
+page PrivacyPage {
+  component: import PrivacyPage from "@src/legal/PrivacyPage"
+}
+
+route TermsRoute { path: "/terms", to: TermsPage }
+page TermsPage {
+  component: import TermsPage from "@src/legal/TermsPage"
 }
 
 route NotFoundRoute { path: "*", to: NotFoundPage }

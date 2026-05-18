@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "wasp/client/auth";
 import Hero from "./components/Hero";
 import Clients from "./components/Clients";
+import HowItWorks from "./components/HowItWorks";
 import FeaturesGrid from "./components/FeaturesGrid";
 import Testimonials from "./components/Testimonials";
 import FAQ from "./components/FAQ";
@@ -30,6 +31,7 @@ export default function LandingPage() {
     <div className="bg-background text-foreground min-h-screen">
       <Hero />
       <Clients />
+      <HowItWorks />
       <FeaturesGrid features={features} />
       <Testimonials testimonials={testimonials} />
       <FAQ faqs={faqs} />
