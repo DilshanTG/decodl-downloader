@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "wasp/client/auth";
 import { useQuery } from "wasp/client/operations";
 import {
@@ -49,6 +49,44 @@ function detectProvider(url: string): string | null {
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "refunded"]);
 
+// Play a pleasant two-tone chime using Web Audio API — no external files needed
+function playChime() {
+  try {
+    const ctx = new AudioContext();
+    const times = [0, 0.18];
+    const freqs = [1046.5, 1318.5]; // C6, E6
+    times.forEach((t, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freqs[i];
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.6);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.6);
+    });
+  } catch {}
+}
+
+// Show browser notification — requests permission automatically on first call
+async function showNotification(title: string, body: string) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    await Notification.requestPermission();
+  }
+  if (Notification.permission === "granted") {
+    new Notification(title, {
+      body,
+      icon: "/stockmart-logo.svg",
+      badge: "/stockmart-logo.svg",
+      silent: true, // we handle sound ourselves
+    });
+  }
+}
+
 function SkeletonRow() {
   return (
     <div className="animate-pulse flex items-center gap-4 py-4 border-b border-border">
@@ -88,6 +126,8 @@ export default function DashboardPage() {
     ? (url.length > 5 ? detectProvider(url) : null)
     : (manuallySelectedProvider || null);
   const [pollInterval, setPollInterval] = useState<number | false>(2000);
+  // Track previous statuses to detect transitions → completed/failed
+  const prevStatusesRef = useRef<Record<string, string>>({});
 
   const {
     data: downloadsData,
@@ -124,8 +164,36 @@ export default function DashboardPage() {
     const hasActive = downloadsData.downloads
       .slice(0, 10)
       .some((d: any) => !TERMINAL_STATUSES.has(d.status));
-    // 2s polling when any download is active, stop completely when all done
     setPollInterval(hasActive ? 2000 : false);
+  }, [downloadsData]);
+
+  // Detect download status transitions → fire chime + browser notification
+  useEffect(() => {
+    const downloads = downloadsData?.downloads ?? [];
+    if (downloads.length === 0) return;
+
+    const prev = prevStatusesRef.current;
+    downloads.forEach((d: any) => {
+      const wasActive = prev[d.id] && !TERMINAL_STATUSES.has(prev[d.id]);
+      if (wasActive && d.status === "completed") {
+        playChime();
+        showNotification(
+          "✅ Download Ready!",
+          `${d.providerSlug} — your file is ready to download.`
+        );
+      }
+      if (wasActive && d.status === "failed") {
+        showNotification(
+          "❌ Download Failed",
+          `${d.providerSlug} — credits refunded automatically.`
+        );
+      }
+    });
+
+    // Update ref with current statuses
+    const next: Record<string, string> = {};
+    downloads.forEach((d: any) => { next[d.id] = d.status; });
+    prevStatusesRef.current = next;
   }, [downloadsData]);
 
   useEffect(() => {
