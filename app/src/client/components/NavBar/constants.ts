@@ -10,5 +10,6 @@ export const marketingNavigationItems: NavigationItem[] = [
 export const appNavigationItems: NavigationItem[] = [
   { name: "Dashboard", to: routes.DashboardRoute.to },
   { name: "History", to: routes.DownloadHistoryRoute.to },
+  { name: "Credits", to: routes.CreditsRoute.to },
   { name: "Pricing", to: routes.PricingPageRoute.to },
 ] as const;

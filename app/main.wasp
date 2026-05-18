@@ -136,6 +136,12 @@ page DownloadDetailPage {
   component: import DownloadDetailPage from "@src/downloads/DetailPage"
 }
 
+route CreditsRoute { path: "/credits", to: CreditsPage }
+page CreditsPage {
+  authRequired: true,
+  component: import CreditsPage from "@src/credits/CreditsPage"
+}
+
 // ─── Download Operations ──────────────────────────────────────────────────────
 query getMyDownloads {
   fn: import { getMyDownloads } from "@src/downloads/operations",

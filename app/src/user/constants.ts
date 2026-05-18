@@ -1,4 +1,4 @@
-import { History, LayoutDashboard, Settings, Shield } from "lucide-react";
+import { History, LayoutDashboard, Settings, Shield, Coins } from "lucide-react";
 import { routes } from "wasp/client/router";
 
 export const userMenuItems = [
@@ -13,6 +13,13 @@ export const userMenuItems = [
     name: "Download History",
     to: routes.DownloadHistoryRoute.to,
     icon: History,
+    isAdminOnly: false,
+    isAuthRequired: true,
+  },
+  {
+    name: "Credit History",
+    to: routes.CreditsRoute.to,
+    icon: Coins,
     isAdminOnly: false,
     isAuthRequired: true,
   },
