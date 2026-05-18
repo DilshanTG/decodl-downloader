@@ -89,11 +89,11 @@ export default function Hero() {
         {/* Provider Pills */}
         <div className="mt-12 flex flex-wrap justify-center gap-2">
           {PROVIDER_PILLS.map(p => (
-            <span key={p.slug} title={p.label} className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 hover:border-primary/40 hover:bg-accent/50 transition-colors">
+            <span key={p.slug} title={p.label} className="inline-flex items-center rounded-full border border-border bg-white dark:bg-white px-3 py-1.5 hover:border-primary/40 hover:shadow-sm transition-all">
               <img
                 src={`/provider-logos/${p.slug}.svg`}
                 alt={p.label}
-                className="h-5 w-auto object-contain"
+                className="h-5 w-auto object-contain max-w-[80px]"
                 onError={(e) => {
                   const img = e.currentTarget as HTMLImageElement;
                   img.style.display = "none";
@@ -101,7 +101,7 @@ export default function Hero() {
                   if (fallback) fallback.style.display = "inline";
                 }}
               />
-              <span className="hidden text-xs font-semibold text-muted-foreground">{p.label}</span>
+              <span className="hidden text-xs font-semibold text-gray-600">{p.label}</span>
             </span>
           ))}
           <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground/60">

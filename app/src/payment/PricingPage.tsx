@@ -59,11 +59,11 @@ function ProviderLogoCard({ slug, name, minCost, maxCost }: {
 
   return (
     <div className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 group">
-      <div className="w-full h-12 flex items-center justify-center">
+      <div className="w-full h-12 flex items-center justify-center rounded-xl bg-white px-2">
         <img
           src={`/provider-logos/png/${slug}.png`}
           alt={name}
-          className="h-10 w-full object-contain"
+          className="h-8 w-full object-contain"
           onError={(e) => {
             const img = e.currentTarget;
             if (!img.dataset.triedSvg) {
@@ -76,7 +76,7 @@ function ProviderLogoCard({ slug, name, minCost, maxCost }: {
             }
           }}
         />
-        <span className="hidden w-full h-10 items-center justify-center text-xs font-bold text-muted-foreground/70 bg-muted/40 rounded-lg">
+        <span className="hidden w-full h-8 items-center justify-center text-xs font-bold text-gray-600 rounded-lg">
           {name}
         </span>
       </div>
@@ -387,20 +387,22 @@ export default function PricingPage() {
                         {rows.map((p) => (
                           <tr key={`${p.slug}-${p.variant}`} className="hover:bg-accent/20 transition-colors">
                             <td className="py-3 px-4">
-                              <img
-                                src={`/provider-logos/png/${p.slug}.png`}
-                                alt={p.displayName}
-                                className="h-7 w-10 object-contain"
-                                onError={(e) => {
-                                  const img = e.currentTarget;
-                                  if (!img.dataset.triedSvg) {
-                                    img.dataset.triedSvg = "1";
-                                    img.src = `/provider-logos/${p.slug}.svg`;
-                                  } else {
-                                    img.style.display = "none";
-                                  }
-                                }}
-                              />
+                              <div className="w-12 h-7 bg-white rounded flex items-center justify-center px-1">
+                                <img
+                                  src={`/provider-logos/png/${p.slug}.png`}
+                                  alt={p.displayName}
+                                  className="h-5 w-full object-contain"
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.triedSvg) {
+                                      img.dataset.triedSvg = "1";
+                                      img.src = `/provider-logos/${p.slug}.svg`;
+                                    } else {
+                                      img.style.display = "none";
+                                    }
+                                  }}
+                                />
+                              </div>
                             </td>
                             <td className="py-3 px-4 font-semibold text-foreground">{p.displayName.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| Select$| HD Select$| 4K Select$/, "")}</td>
                             <td className="py-3 px-4 text-muted-foreground capitalize">
