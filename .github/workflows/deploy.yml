@@ -16,7 +16,7 @@ jobs:
 
       # ── Install Wasp ───────────────────────────────────────────────────────
       - name: Install Wasp CLI
-        run: curl -sSL https://get.wasp-lang.dev/installer.sh | sh -s -- -v 0.15.3
+        run: curl -sSL https://get.wasp-lang.dev/installer.sh | sh -s -- -v 0.22.4
 
       - name: Add Wasp to PATH
         run: echo "$HOME/.wasp/bin" >> $GITHUB_PATH
@@ -32,7 +32,9 @@ jobs:
 
       - name: Deploy backend to Railway
         working-directory: app/.wasp/out
-        run: railway up --service stockmart --detach
+        run: |
+          printf '[build]\ndockerfilePath = "Dockerfile"\n[deploy]\nhealthcheckPath = "/"\nhealthcheckTimeout = 120\n' > railway.toml
+          railway up --service stockmart --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
