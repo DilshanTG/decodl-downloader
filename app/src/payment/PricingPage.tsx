@@ -233,7 +233,7 @@ export default function PricingPage() {
         <div className="mb-4 text-center">
           <h2 className="text-2xl font-bold tracking-tight mb-2">Choose Your Credit Pack</h2>
           <p className="text-sm text-muted-foreground">Buy once, use anytime. Credits never expire.</p>
-          <p className="text-xs text-muted-foreground mt-1 opacity-70">1 credit ≈ Rs. 180 · Most downloads cost 1–3 credits</p>
+          <p className="text-xs text-muted-foreground mt-1 opacity-70">1 credit ≈ Rs. 180 · Most downloads cost 1–3 credits · Prices include 3% card fee</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {CREDIT_PACKAGES.map((pkg) => {
@@ -269,8 +269,11 @@ export default function PricingPage() {
                   )}
                   <div className="my-2">
                     <span className="text-4xl font-extrabold tracking-tight">
-                      Rs. {pkg.priceLKR.toLocaleString()}
+                      Rs. {Math.round(pkg.priceLKR * 1.03).toLocaleString()}
                     </span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Rs. {pkg.priceLKR.toLocaleString()} + 3% card fee
+                    </p>
                   </div>
                 </CardHeader>
 

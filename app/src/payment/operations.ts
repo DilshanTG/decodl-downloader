@@ -40,6 +40,12 @@ export const createPayherePayment: CreatePayherePayment<
   const merchantKey = process.env.PAYHERE_MERCHANT_KEY!
   const clientOrderId = `SG-${Date.now()}-${context.user.id.slice(0, 8)}`
 
+  // Add 3% card payment processing fee
+  const CARD_FEE_RATE = 0.03
+  const finalAmount = Math.round(pkg.amountLKR * (1 + CARD_FEE_RATE))
+
+  const customerName = (context.user as any).username || context.user.email?.split('@')[0] || 'Customer'
+
   // Call DigiMart init endpoint
   const initRes = await fetch(`${DIGIMART_BASE}/api/v1/init`, {
     method: 'POST',
@@ -48,14 +54,15 @@ export const createPayherePayment: CreatePayherePayment<
       'Authorization': `Bearer ${merchantKey}`,
     },
     body: JSON.stringify({
-      amount: pkg.amountLKR,
-      // Derive return/cancel URLs from WASP_WEB_CLIENT_URL so one env var controls all frontend URLs
+      amount: finalAmount,
       return_url: `${process.env.WASP_WEB_CLIENT_URL}/dashboard?payment=success`,
       cancel_url: `${process.env.WASP_WEB_CLIENT_URL}/pricing`,
       notify_url: process.env.PAYHERE_NOTIFY_URL,
       client_order_id: clientOrderId,
       customer_email: context.user.email ?? '',
-      first_name: context.user.email?.split('@')[0] ?? 'Customer',
+      first_name: customerName,
+      last_name: 'LK',
+      description: `StockMart.lk - ${pkg.name} (${pkg.credits} Credits)`,
     }),
   })
 
@@ -83,7 +90,7 @@ export const createPayherePayment: CreatePayherePayment<
       userId: context.user.id,
       payhereOrderId: order_id,
       payherePaymentId: null,
-      amountLKR: pkg.amountLKR,
+      amountLKR: finalAmount,
       packageId,
       creditsAwarded: pkg.credits,
       status: 'pending',
@@ -91,7 +98,7 @@ export const createPayherePayment: CreatePayherePayment<
     },
   })
 
-  console.log(`Payment initiated: ${order_id} (${pkg.name}, Rs. ${pkg.amountLKR}) for user ${context.user.id}`)
+  console.log(`Payment initiated: ${order_id} (${pkg.name}, Rs. ${finalAmount} incl. 3% fee) for user ${context.user.id}`)
 
   return { paymentUrl: payment_url }
 }
