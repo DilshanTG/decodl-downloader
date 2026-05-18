@@ -80,9 +80,16 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   if (!resolvedSlug) throw new HttpError(400, 'Could not detect provider. Please paste a valid URL.')
 
   // 2. Look up credit cost from DB (not the 5-min cache — pricing is used for billing, must be fresh)
+  // magnific_video/magnific are rebranded freepik — DB pricing lives under freepik slugs.
+  const billingSlug = resolvedSlug === 'magnific_video' ? 'freepik_video'
+                    : resolvedSlug === 'magnific'       ? 'freepik'
+                    : resolvedSlug
   const resolvedVariant = variant || 'normal'
   const pricing = await context.entities.ProviderPricing.findFirst({
-    where: { slug: resolvedSlug, variant: resolvedVariant, isActive: true },
+    where: { slug: billingSlug, variant: resolvedVariant, isActive: true },
+  }) ?? await context.entities.ProviderPricing.findFirst({
+    where: { slug: billingSlug, isActive: true },
+    orderBy: { creditCost: 'asc' },
   })
   if (!pricing) throw new HttpError(404, `Provider "${resolvedSlug}" (${resolvedVariant}) not found or inactive.`)
 
@@ -279,18 +286,22 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
   try {
     const info = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
 
+    // Magnific is the rebranded Freepik — DB pricing lives under freepik/freepik_video slugs.
+    const dbSlug = resolvedSlug === 'magnific_video' ? 'freepik_video'
+                 : resolvedSlug === 'magnific'       ? 'freepik'
+                 : resolvedSlug
+
     // For providers with format variants (video HD/4K), look up the variant-specific price.
-    // The format option value maps directly to the DB variant name (e.g. "HD" → variant "HD").
     const formatOption = (options as Array<{ name: string; value: string }>).find(o => o.name === 'format')
     const pricing = formatOption
       ? (await context.entities.ProviderPricing.findFirst({
-          where: { slug: resolvedSlug, variant: formatOption.value, isActive: true },
+          where: { slug: dbSlug, variant: formatOption.value, isActive: true },
         }) ?? await context.entities.ProviderPricing.findFirst({
-          where: { slug: resolvedSlug, isActive: true },
+          where: { slug: dbSlug, isActive: true },
           orderBy: { creditCost: 'asc' },
         }))
       : await context.entities.ProviderPricing.findFirst({
-          where: { slug: resolvedSlug, isActive: true },
+          where: { slug: dbSlug, isActive: true },
           orderBy: { creditCost: 'asc' },
         })
 
@@ -309,8 +320,11 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
     }
   } catch (err: any) {
     console.error('Decodl /info retrieval error:', err)
+    const fallbackSlug = resolvedSlug === 'magnific_video' ? 'freepik_video'
+                       : resolvedSlug === 'magnific'       ? 'freepik'
+                       : resolvedSlug
     const pricing = await context.entities.ProviderPricing.findFirst({
-      where: { slug: resolvedSlug, isActive: true },
+      where: { slug: fallbackSlug, isActive: true },
     })
     return {
       providerSlug: resolvedSlug,

@@ -24,7 +24,7 @@ function detectProvider(url: string): string | null {
   if (/shutterstock\.com/.test(url)) return "shutterstock";
   if (/stock\.adobe\.com\/video/.test(url)) return "adobestock_video";
   if (/stock\.adobe\.com/.test(url)) return "adobestock";
-  if (/magnific\.com\/free-video/.test(url)) return "magnific_video";
+  if (/magnific\.com\/(free-video|premium-video)/.test(url)) return "magnific_video";
   if (/magnific\.com/.test(url)) return "magnific";
   if (/freepik\.com\/video/.test(url)) return "freepik_video";
   if (/freepik\.com/.test(url)) return "freepik";

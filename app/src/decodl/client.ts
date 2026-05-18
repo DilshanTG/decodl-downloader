@@ -247,7 +247,7 @@ const URL_PATTERNS: Array<{ pattern: RegExp; slug: string }> = [
   { pattern: /shutterstock\.com/, slug: 'shutterstock' },
   { pattern: /stock\.adobe\.com\/video/, slug: 'adobestock_video' },
   { pattern: /stock\.adobe\.com/, slug: 'adobestock' },
-  { pattern: /magnific\.com\/free-video/, slug: 'magnific_video' },
+  { pattern: /magnific\.com\/(free-video|premium-video)/, slug: 'magnific_video' },
   { pattern: /magnific\.com/, slug: 'magnific' },
   { pattern: /freepik\.com\/video/, slug: 'freepik_video' },
   { pattern: /freepik\.com/, slug: 'freepik' },
