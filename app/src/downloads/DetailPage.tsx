@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "wasp/client/operations";
-import { getDownloadById, retryFailedDownload, getMyDownloads } from "wasp/client/operations";
+import { getDownloadById, retryFailedDownload, getMyDownloads, getProviderPricing } from "wasp/client/operations";
+import type { ProviderPricing } from "wasp/entities";
 import { useParams } from "react-router";
 import { Link } from "wasp/client/router";
 import { routes } from "wasp/client/router";
@@ -11,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../cl
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "refunded"]);
 
-function getDownloadUrl(downloadId: string) {
-  return `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+function getDownloadUrl(downloadId: string, downloadToken?: string) {
+  const base = `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+  return downloadToken ? `${base}?token=${downloadToken}` : base;
 }
 
 const TIMELINE_STEPS = [
@@ -31,11 +33,13 @@ function ExpiryCountdown({ expiresAt, onExpire }: { expiresAt: string; onExpire?
   const [remaining, setRemaining] = useState("");
 
   useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
     const calc = () => {
       const diff = new Date(expiresAt).getTime() - Date.now();
       if (diff <= 0) {
         setRemaining("Expired");
         onExpire?.();
+        clearInterval(timer);
         return;
       }
       const h = Math.floor(diff / 3_600_000);
@@ -46,8 +50,8 @@ function ExpiryCountdown({ expiresAt, onExpire }: { expiresAt: string; onExpire?
       else setRemaining(`${s}s`);
     };
     calc();
-    const id = setInterval(calc, 1000);
-    return () => clearInterval(id);
+    timer = setInterval(calc, 1000);
+    return () => clearInterval(timer);
   }, [expiresAt]);
 
   const isExpired = remaining === "Expired";
@@ -78,6 +82,13 @@ export default function DetailPage() {
 
   const { data: downloadsData } = useQuery(getMyDownloads, {});
   const allDownloads = downloadsData?.downloads ?? [];
+  const { data: pricingData } = useQuery(getProviderPricing, undefined, { staleTime: 5 * 60 * 1000 });
+
+  const getDisplayName = (slug: string) => {
+    if (!pricingData) return slug;
+    const found = (pricingData as ProviderPricing[]).find(p => p.slug === slug);
+    return found?.displayName?.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| VIP.*$/, "") ?? slug;
+  };
 
   const optionsArray = download?.options;
   const isBulk = Array.isArray(optionsArray) && optionsArray.some((o: any) => o.name === "isBulk" && o.value === "true");
@@ -154,22 +165,31 @@ export default function DetailPage() {
         {/* Main card */}
         <Card className="border-border shadow-md overflow-hidden bg-card" variant="bento">
           {/* Thumbnail */}
-          {download.thumbnailUrl && (
-            <div className="w-full aspect-video bg-muted/30 border-b border-border overflow-hidden flex items-center justify-center relative">
+          <div className="w-full aspect-video bg-muted/30 border-b border-border overflow-hidden flex items-center justify-center relative">
+            {download.thumbnailUrl ? (
               <img
                 src={download.thumbnailUrl}
                 alt="Preview"
-                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                  (e.target as HTMLImageElement).nextElementSibling?.removeAttribute("hidden");
+                }}
               />
+            ) : null}
+            <div className={`${download.thumbnailUrl ? "hidden" : ""} flex flex-col items-center gap-2 text-muted-foreground`}>
+              <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs font-medium opacity-50">No preview available</span>
             </div>
-          )}
+          </div>
 
           <CardContent className="p-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
               <div>
-                <CardTitle className="text-2xl font-black">{download.providerSlug}</CardTitle>
+                <CardTitle className="text-2xl font-black">{getDisplayName(download.providerSlug)}</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1.5 font-medium">
                   {new Date(download.createdAt).toLocaleDateString("en-GB", {
                     weekday: "long", day: "2-digit", month: "long", year: "numeric",
@@ -242,22 +262,31 @@ export default function DetailPage() {
 
             {/* Download Action */}
             {canDownload && (
-              <Button
-                asChild
-                className="w-full py-7 rounded-xl font-extrabold text-base tracking-wide shadow-md transition-transform active:scale-[0.99] mb-4"
-              >
-                <a href={getDownloadUrl(download.id)} target="_blank" rel="noopener noreferrer">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download Complete File
-                </a>
-              </Button>
+              <div className="mb-4">
+                <Button
+                  asChild
+                  className="w-full py-7 rounded-xl font-extrabold text-base tracking-wide shadow-md transition-transform active:scale-[0.99]"
+                >
+                  <a href={getDownloadUrl(download.id, download.downloadToken)} target="_blank" rel="noopener noreferrer">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Complete File
+                  </a>
+                </Button>
+                <p className="text-[11px] text-muted-foreground text-center mt-2">
+                  👆 Click to save the file to your computer's Downloads folder
+                  {download.expiresAt && !isExpired && (
+                    <> · <span className="text-amber-500 font-semibold">Available until {new Date(download.expiresAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></>
+                  )}
+                </p>
+              </div>
             )}
 
             {download.status === "completed" && isExpired && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl px-4 py-3 text-sm font-semibold mb-4 text-center">
-                This download link has expired. Files are available for 24 hours after completion.
+              <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl px-4 py-4 mb-4 text-center">
+                <p className="text-sm font-bold mb-1">⏰ Download link expired</p>
+                <p className="text-xs opacity-90">Files are only available for <strong>24 hours</strong> after completion. This file is no longer accessible. You can retry the download from the button below (credits will be charged again).</p>
               </div>
             )}
 
@@ -269,11 +298,12 @@ export default function DetailPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                   </svg>
                   <span>
-                    {(download.options as any)?.progress 
+                    {(download.options as any)?.progress
                       ? `Preparing premium media: ${(download.options as any).progress}% completed`
-                      : "Your premium file is being prepared. This page will update automatically."}
+                      : "Your premium file is being prepared..."}
                   </span>
                 </div>
+                <p className="text-xs text-primary/80 font-medium">⏱ Usually ready in <strong>30–90 seconds</strong>. This page updates automatically — no need to refresh.</p>
                 {!!(download.options as any)?.progress && (
                   <div className="w-full bg-primary/20 rounded-full h-2.5 overflow-hidden">
                     <div 
@@ -289,7 +319,9 @@ export default function DetailPage() {
               <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl p-4 mb-4">
                 <p className="text-sm font-bold mb-1">Download process failed</p>
                 {download.errorMessage && (
-                  <p className="text-xs font-semibold opacity-90">{download.errorMessage}</p>
+                  <p className="text-xs font-semibold opacity-90 break-words" title={download.errorMessage}>
+                    {download.errorMessage}
+                  </p>
                 )}
                 {download.retryCount < 3 && (
                   <Button
@@ -349,7 +381,7 @@ export default function DetailPage() {
                           </span>
                           {canDownloadItem ? (
                             <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3 shadow-sm">
-                              <a href={getDownloadUrl(item.id)} target="_blank" rel="noopener noreferrer">
+                              <a href={getDownloadUrl(item.id, item.downloadToken)} target="_blank" rel="noopener noreferrer">
                                 Download File
                               </a>
                             </Button>
@@ -372,12 +404,32 @@ export default function DetailPage() {
               <dl className="space-y-3.5">
                 <div className="flex justify-between text-sm">
                   <dt className="text-muted-foreground font-semibold">Provider</dt>
-                  <dd className="text-foreground font-extrabold">{download.providerSlug}</dd>
+                  <dd className="text-foreground font-extrabold">{getDisplayName(download.providerSlug)}</dd>
                 </div>
                 <div className="flex justify-between text-sm">
                   <dt className="text-muted-foreground font-semibold">Credits Charged</dt>
                   <dd className="text-foreground font-extrabold">{download.creditsCharged ?? "—"}</dd>
                 </div>
+                {(download.link || download.code) && (
+                  <div className="flex justify-between text-sm gap-4 items-start">
+                    <dt className="text-muted-foreground font-semibold shrink-0">{download.link ? "Submitted URL" : "Submitted Code"}</dt>
+                    <dd className="text-right max-w-[260px]">
+                      {download.link ? (
+                        <a
+                          href={download.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary text-xs font-semibold hover:underline break-all"
+                          title={download.link}
+                        >
+                          {download.link.length > 60 ? download.link.slice(0, 57) + "…" : download.link}
+                        </a>
+                      ) : (
+                        <span className="text-foreground font-mono text-xs font-bold">{download.code}</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
                 {download.fileName && (
                   <div className="flex justify-between text-sm gap-4">
                     <dt className="text-muted-foreground font-semibold shrink-0">File Name</dt>

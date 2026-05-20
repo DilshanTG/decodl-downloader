@@ -19,7 +19,7 @@ export default function Footer({
           {/* Brand column */}
           <div className="md:col-span-1">
             <div className="mb-4">
-              <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-8 object-contain" />
+              <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-14 object-contain" />
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Sri Lanka's premium stock media download platform. Pay in LKR. Download from 20+ global providers.

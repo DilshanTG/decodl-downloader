@@ -1,35 +1,81 @@
 import { useState } from "react";
 import { useQuery } from "wasp/client/operations";
-import { getMyDownloads, retryFailedDownload } from "wasp/client/operations";
+import { getMyDownloads, retryFailedDownload, getProviderPricing } from "wasp/client/operations";
 import { Link } from "wasp/client/router";
 import { routes } from "wasp/client/router";
-import { DOWNLOAD_STATUS_COLORS, DOWNLOAD_STATUS_LABELS } from "../shared/constants";
 import { groupDownloads, getBatchStatusText } from "../shared/grouping";
 import { useToast } from "../client/hooks/use-toast";
 import { Button } from "../client/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../client/components/ui/card";
+import type { ProviderPricing } from "wasp/entities";
+import {
+  CheckCircle2, XCircle, Clock, Loader2, RotateCcw,
+  Download, Layers, ChevronRight, Plus, AlertCircle,
+} from "lucide-react";
 
-function getDownloadUrl(downloadId: string) {
-  return `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+function getDownloadUrl(downloadId: string, downloadToken?: string) {
+  const base = `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+  return downloadToken ? `${base}?token=${downloadToken}` : base;
 }
+
+function getDateLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+}
+
+function groupByDate(downloads: any[]): { label: string; items: any[] }[] {
+  const groups: Record<string, any[]> = {};
+  for (const d of downloads) {
+    const key = new Date(d.createdAt).toDateString();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  }
+  return Object.entries(groups).map(([key, items]) => ({
+    label: getDateLabel(items[0].createdAt),
+    items,
+  }));
+}
+
+function StatusIcon({ status, isProcessing }: { status: string; isProcessing: boolean }) {
+  if (isProcessing) return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+  if (status === "completed") return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+  if (status === "failed") return <XCircle className="w-4 h-4 text-red-500" />;
+  if (status === "refunded") return <RotateCcw className="w-4 h-4 text-muted-foreground" />;
+  return <Clock className="w-4 h-4 text-yellow-500" />;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending:    "text-yellow-600 bg-yellow-500/10",
+  processing: "text-blue-600 bg-blue-500/10",
+  completed:  "text-green-600 bg-green-500/10",
+  failed:     "text-red-600 bg-red-500/10",
+  refunded:   "text-muted-foreground bg-muted",
+};
 
 const STATUS_FILTERS = [
   { value: "", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "completed", label: "Completed" },
-  { value: "failed", label: "Failed" },
+  { value: "pending",    label: "Getting Ready" },
+  { value: "processing", label: "In Progress" },
+  { value: "completed",  label: "Completed" },
+  { value: "failed",     label: "Failed" },
 ];
 
-function SkeletonRow() {
+function SkeletonCard() {
   return (
-    <tr className="animate-pulse">
-      <td className="py-4 px-4"><div className="h-4 bg-muted rounded w-32"></div></td>
-      <td className="py-4 px-4"><div className="h-4 bg-muted rounded w-28"></div></td>
-      <td className="py-4 px-4"><div className="h-5 bg-muted rounded-full w-20"></div></td>
-      <td className="py-4 px-4"><div className="h-4 bg-muted rounded w-12"></div></td>
-      <td className="py-4 px-4"><div className="h-8 bg-muted rounded-lg w-20"></div></td>
-    </tr>
+    <div className="animate-pulse flex items-center gap-4 p-4 rounded-2xl border border-border bg-card">
+      <div className="w-10 h-10 rounded-xl bg-muted shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-muted rounded w-32" />
+        <div className="h-3 bg-muted rounded w-20" />
+      </div>
+      <div className="h-6 bg-muted rounded-full w-20" />
+      <div className="h-8 bg-muted rounded-lg w-20" />
+    </div>
   );
 }
 
@@ -37,22 +83,28 @@ export default function HistoryPage() {
   const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
-  const [providerFilter, setProviderFilter] = useState("");
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery(
     getMyDownloads,
-    { page, status: statusFilter || undefined, providerSlug: providerFilter || undefined },
-    { refetchInterval: 8000 }
+    { page, status: statusFilter || undefined },
+    { refetchInterval: 15000, staleTime: 10000 }
   );
+  const { data: pricingData } = useQuery(getProviderPricing, undefined, { staleTime: 5 * 60 * 1000 });
 
   const rawDownloads = data?.downloads ?? [];
   const downloads: any[] = groupDownloads(rawDownloads);
   const totalPages: number = data?.totalPages ?? 1;
   const total: number = data?.total ?? 0;
+  const dateGroups = groupByDate(downloads);
 
-  // Collect unique providers from results for filter dropdown
-  const providerOptions = Array.from(new Set(downloads.map((d: any) => d.providerSlug))).filter(Boolean);
+  const getDisplayName = (slug: string) => {
+    if (!pricingData) return slug;
+    const found = (pricingData as ProviderPricing[]).find(p => p.slug === slug);
+    return found?.displayName?.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| VIP.*$/, "") ?? slug;
+  };
+
+  const isExpired = (d: any) => d.expiresAt && new Date(d.expiresAt) < new Date();
 
   const handleRetry = async (id: string) => {
     setRetryingId(id);
@@ -61,125 +113,129 @@ export default function HistoryPage() {
       refetch();
       toast({ title: "Retry submitted", description: "Your download has been re-queued." });
     } catch (err: any) {
-      toast({ title: "Retry failed", description: err?.message || "Could not retry download.", variant: "destructive" });
+      toast({ title: "Retry failed", description: err?.message || "Could not retry.", variant: "destructive" });
     } finally {
       setRetryingId(null);
     }
   };
 
-  const isExpired = (d: any) => {
-    if (!d.expiresAt) return false;
-    return new Date(d.expiresAt) < new Date();
-  };
-
   return (
-    <div className="min-h-screen bg-background text-foreground py-10 px-4">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-3xl mx-auto px-4 pt-10 pb-20">
+
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pt-6">
+        <div className="flex items-center justify-between mb-8 pt-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Download History</h1>
-            <p className="text-muted-foreground text-sm mt-1.5">{total > 0 ? `${total} total downloads` : "All your downloads"}</p>
+            <h1 className="text-2xl font-black tracking-tight">Download History</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {total > 0 ? `${total} total downloads` : "No downloads yet"}
+            </p>
           </div>
-          <Button variant="default" asChild className="rounded-xl font-semibold shadow-sm">
+          <Button asChild className="rounded-xl font-bold gap-2 shadow-sm">
             <Link to={routes.DashboardRoute?.to || "/dashboard"}>
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus className="w-4 h-4" />
               New Download
             </Link>
           </Button>
         </div>
 
-        {/* Filters */}
-        <Card className="border-border shadow-md p-4 mb-6 bg-card" variant="bento">
-          <CardContent className="p-0 flex flex-col sm:flex-row gap-4 items-center justify-between">
-            {/* Status filters */}
-            <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 sm:flex-wrap">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f.value}
-                  onClick={() => { setStatusFilter(f.value); setPage(1); }}
-                  variant={statusFilter === f.value ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-lg text-xs font-semibold px-3 h-8 shrink-0"
-                >
-                  {f.label}
-                </Button>
-              ))}
+        {/* Status filter pills */}
+        <div className="flex gap-2 flex-wrap mb-6">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => { setStatusFilter(f.value); setPage(1); }}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                statusFilter === f.value
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+          </div>
+        ) : downloads.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-border rounded-3xl bg-card/30">
+            <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Download className="w-6 h-6 text-muted-foreground" />
             </div>
-
-            {/* Provider filters */}
-            {providerOptions.length > 0 && (
-              <div className="w-full sm:w-auto">
-                <select
-                  value={providerFilter}
-                  onChange={(e) => { setProviderFilter(e.target.value); setPage(1); }}
-                  className="w-full sm:w-auto border border-border rounded-lg px-3 py-1.5 text-xs text-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
-                >
-                  <option value="">All Providers</option>
-                  {providerOptions.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
+            <p className="font-bold text-foreground mb-1">
+              {statusFilter ? "No downloads match this filter" : "No downloads yet"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-5">
+              {statusFilter ? "Try a different filter" : "Head to dashboard and paste your first stock URL"}
+            </p>
+            {statusFilter ? (
+              <button
+                onClick={() => { setStatusFilter(""); setPage(1); }}
+                className="text-sm text-primary font-bold hover:underline"
+              >
+                Clear filter
+              </button>
+            ) : (
+              <Button asChild size="sm" className="rounded-xl font-bold">
+                <Link to={routes.DashboardRoute?.to || "/dashboard"}>Go to Dashboard →</Link>
+              </Button>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Table view */}
-        <Card className="border-border shadow-md overflow-hidden bg-card" variant="bento">
-          <CardContent className="p-0">
-            {/* Mobile view list */}
-            <div className="block sm:hidden divide-y divide-border">
-              {isLoading ? (
-                [1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="animate-pulse p-4">
-                    <div className="h-4 bg-muted rounded w-32 mb-2"></div>
-                    <div className="h-3 bg-muted rounded w-24"></div>
-                  </div>
-                ))
-              ) : downloads.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </div>
-                  <p className="text-muted-foreground text-sm font-medium">No downloads found</p>
-                  {(statusFilter || providerFilter) ? (
-                    <Button
-                      onClick={() => { setStatusFilter(""); setProviderFilter(""); setPage(1); }}
-                      variant="link"
-                      className="text-primary text-sm hover:underline mt-2"
-                    >
-                      Clear filters
-                    </Button>
-                  ) : (
-                    <Button asChild variant="default" size="sm" className="mt-4 rounded-xl font-bold text-xs">
-                      <Link to={routes.DashboardRoute?.to || "/dashboard"}>Download your first asset →</Link>
-                    </Button>
-                  )}
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {dateGroups.map(({ label, items }) => (
+              <div key={label}>
+                {/* Date header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    {label}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground font-semibold">{items.length}</span>
                 </div>
-              ) : (
-                downloads.map((d: any) => {
-                  const statusInfo = d.isBulk
-                    ? getBatchStatusText(d.items)
-                    : {
-                        text: DOWNLOAD_STATUS_LABELS[d.status] || d.status,
-                        colorClass: DOWNLOAD_STATUS_COLORS[d.status] || "bg-muted text-foreground",
-                        isProcessing: d.status === "processing"
-                      };
 
-                  return (
-                    <div key={d.id} className="p-4">
-                      <div className="flex items-start justify-between gap-2">
+                {/* Cards */}
+                <div className="space-y-2">
+                  {items.map((d: any) => {
+                    const statusInfo = d.isBulk
+                      ? getBatchStatusText(d.items)
+                      : {
+                          text: {
+                            pending: "Getting Ready", processing: "In Progress",
+                            completed: "Completed", failed: "Download Failed", refunded: "Credits Returned",
+                          }[d.status as string] ?? d.status,
+                          colorClass: STATUS_COLORS[d.status] ?? "bg-muted text-muted-foreground",
+                          isProcessing: d.status === "processing" || d.status === "pending",
+                        };
+
+                    const isCompleted = !d.isBulk && d.status === "completed" && d.downloadUrl && !isExpired(d);
+                    const isFailed = !d.isBulk && d.status === "failed";
+                    const isExpiredDownload = !d.isBulk && d.status === "completed" && isExpired(d);
+
+                    return (
+                      <div
+                        key={d.id}
+                        className={`group flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border transition-all duration-200 ${
+                          isCompleted
+                            ? "border-green-500/20 bg-green-500/5 hover:border-green-500/40"
+                            : isFailed
+                            ? "border-red-500/10 bg-red-500/5 hover:border-red-500/20"
+                            : "border-border bg-card hover:border-primary/20 hover:bg-accent/30"
+                        }`}
+                      >
+                        {/* Provider logo + info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-16 h-9 bg-white rounded-lg flex items-center justify-center px-1.5 shrink-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 p-1.5 ${
+                            isCompleted ? "bg-white" : isFailed ? "bg-red-50 dark:bg-red-950/30" : "bg-white"
+                          }`}>
                             <img
                               src={`/provider-logos/png/${d.providerSlug}.png`}
-                              alt={d.providerSlug}
-                              className="h-6 w-full object-contain"
+                              alt=""
+                              className="w-full h-full object-contain"
                               onError={(e) => {
                                 const img = e.currentTarget;
                                 if (!img.dataset.triedSvg) {
@@ -191,243 +247,127 @@ export default function HistoryPage() {
                               }}
                             />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-foreground">
-                              {d.providerSlug}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-foreground">
+                                {d.isBulk ? "Bulk Batch" : getDisplayName(d.providerSlug)}
+                              </span>
                               {d.isBulk && (
-                                <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Bulk ({d.items.length})
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                  <Layers className="w-2.5 h-2.5" />
+                                  {d.items.length} files
                                 </span>
                               )}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {new Date(d.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                            </p>
-                          </div>
-                        </div>
-                        <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
-                          {statusInfo.isProcessing && (
-                            <svg className="animate-spin -ml-0.5 mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                          )}
-                          {statusInfo.text}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-xs text-muted-foreground font-bold">{d.creditsCharged ? `${d.creditsCharged.toFixed(1)} credits` : "—"}</span>
-                        {!d.isBulk && d.status === "completed" && isExpired(d) && (
-                          <span className="text-xs text-muted-foreground font-bold px-1.5 py-0.5 rounded border border-border">Expired</span>
-                        )}
-                        <div className="ml-auto flex gap-2">
-                          {!d.isBulk && d.status === "completed" && d.downloadUrl && !isExpired(d) && (
-                            <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3">
-                              <a href={getDownloadUrl(d.id)} target="_blank" rel="noopener noreferrer">
-                                Download
-                              </a>
-                            </Button>
-                          )}
-                          {!d.isBulk && d.status === "failed" && d.retryCount < 3 && (
-                            <Button
-                              onClick={() => handleRetry(d.id)}
-                              disabled={retryingId === d.id}
-                              variant="secondary"
-                              className="h-8 rounded-lg text-xs font-bold px-3 border border-border"
-                            >
-                              {retryingId === d.id ? "Retrying..." : "Retry"}
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" asChild className="h-8 rounded-lg text-xs font-semibold px-3 border-border">
-                            <Link to={routes.DownloadDetailRoute.build({ params: { id: d.id } }) as any}>
-                              Details
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Desktop view table */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-accent/30">
-                    <th className="text-left py-4 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Date</th>
-                    <th className="text-left py-4 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Provider</th>
-                    <th className="text-left py-4 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Status</th>
-                    <th className="text-left py-4 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Credits</th>
-                    <th className="text-left py-4 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {isLoading ? (
-                    [1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)
-                  ) : downloads.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-16 text-center">
-                        <p className="text-muted-foreground text-sm font-medium mb-2">No downloads found.</p>
-                        {(statusFilter || providerFilter) ? (
-                          <Button
-                            onClick={() => { setStatusFilter(""); setProviderFilter(""); setPage(1); }}
-                            variant="link"
-                            className="text-primary hover:underline text-sm font-semibold"
-                          >
-                            Clear filters
-                          </Button>
-                        ) : (
-                          <Button asChild variant="default" size="sm" className="mt-2 rounded-xl font-bold text-xs">
-                            <Link to={routes.DashboardRoute?.to || "/dashboard"}>Download your first asset →</Link>
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    downloads.map((d: any) => {
-                      const statusInfo = d.isBulk
-                        ? getBatchStatusText(d.items)
-                        : {
-                            text: DOWNLOAD_STATUS_LABELS[d.status] || d.status,
-                            colorClass: DOWNLOAD_STATUS_COLORS[d.status] || "bg-muted text-foreground",
-                            isProcessing: d.status === "processing"
-                          };
-
-                      return (
-                        <tr key={d.id} className="hover:bg-accent/20 transition-colors group">
-                          <td className="py-4 px-5 text-muted-foreground text-xs whitespace-nowrap">
-                            <span className="font-bold text-foreground">
-                              {new Date(d.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                            </span>
-                            <br />
-                            <span className="text-muted-foreground opacity-80">
-                              {new Date(d.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-20 h-9 bg-white rounded-lg flex items-center justify-center px-2 shrink-0">
-                                <img
-                                  src={`/provider-logos/png/${d.providerSlug}.png`}
-                                  alt={d.providerSlug}
-                                  className="h-6 w-full object-contain"
-                                  onError={(e) => {
-                                    const img = e.currentTarget;
-                                    if (!img.dataset.triedSvg) {
-                                      img.dataset.triedSvg = "1";
-                                      img.src = `/provider-logos/${d.providerSlug}.svg`;
-                                    } else {
-                                      img.style.display = "none";
-                                    }
-                                  }}
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="font-bold text-foreground">
-                                  {d.providerSlug}
-                                  {d.isBulk && (
-                                    <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                      Bulk ({d.items.length})
-                                    </span>
-                                  )}
-                                </span>
-                                {!d.isBulk && d.fileName && (
-                                  <p className="text-xs text-muted-foreground truncate max-w-[180px] mt-0.5">{d.fileName}</p>
-                                )}
-                              </div>
                             </div>
-                          </td>
-                          <td className="py-4 px-5">
-                            <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
-                              {statusInfo.isProcessing && (
-                                <svg className="animate-spin -ml-0.5 mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(d.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                              {d.creditsCharged != null && (
+                                <>
+                                  <span className="text-muted-foreground/40 text-xs">·</span>
+                                  <span className="text-xs font-semibold text-muted-foreground">{d.creditsCharged.toFixed(1)} credits</span>
+                                </>
                               )}
-                              {statusInfo.text}
-                            </span>
-                            {!d.isBulk && d.status === "failed" && d.errorMessage && (
-                              <p className="text-xs text-red-500 mt-1 max-w-[200px] truncate" title={d.errorMessage}>
+                              {isExpiredDownload && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-full">
+                                  <AlertCircle className="w-2.5 h-2.5" /> Expired
+                                </span>
+                              )}
+                              {!d.isBulk && d.expiresAt && !isExpired(d) && d.status === "completed" && (
+                                <span className="text-[10px] text-amber-500 font-semibold">
+                                  Until {new Date(d.expiresAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
+                            </div>
+                            {isFailed && d.errorMessage && (
+                              <p className="text-xs text-red-500 mt-1 font-medium truncate max-w-xs" title={d.errorMessage}>
                                 {d.errorMessage}
                               </p>
                             )}
-                          </td>
-                          <td className="py-4 px-5 text-foreground font-extrabold tabular-nums">
-                            {d.creditsCharged != null ? d.creditsCharged.toFixed(1) : "—"}
-                          </td>
-                          <td className="py-4 px-5">
-                            <div className="flex gap-2">
-                              {!d.isBulk && d.status === "completed" && d.downloadUrl && !isExpired(d) && (
-                                <Button size="sm" variant="default" asChild className="h-8 rounded-lg text-xs font-bold px-3">
-                                  <a href={getDownloadUrl(d.id)} target="_blank" rel="noopener noreferrer">
-                                    Download
-                                  </a>
-                                </Button>
-                              )}
-                              {!d.isBulk && d.status === "completed" && isExpired(d) && (
-                                <span className="text-xs text-muted-foreground px-3 py-1.5 font-bold">Expired</span>
-                              )}
-                              {!d.isBulk && d.status === "failed" && d.retryCount < 3 && (
-                                <Button
-                                  onClick={() => handleRetry(d.id)}
-                                  disabled={retryingId === d.id}
-                                  variant="secondary"
-                                  className="h-8 rounded-lg text-xs font-bold px-3 border border-border"
-                                >
-                                  {retryingId === d.id ? "Retrying..." : "Retry"}
-                                </Button>
-                              )}
-                              {!d.isBulk && d.status === "failed" && d.retryCount >= 3 && (
-                                <span className="text-xs text-red-500 px-3 py-1.5 font-semibold">Max retries</span>
-                              )}
-                              <Button size="sm" variant="outline" asChild className="h-8 rounded-lg text-xs font-semibold px-3 border-border">
-                                <Link to={routes.DownloadDetailRoute.build({ params: { id: d.id } }) as any}>
-                                  Details
-                                </Link>
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          </div>
+                        </div>
 
-            {/* Pagination footer */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-accent/10">
-                <p className="text-xs text-muted-foreground font-semibold">
-                  Page {page} of {totalPages}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg text-xs font-semibold h-8 border-border"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg text-xs font-semibold h-8 border-border"
-                  >
-                    Next
-                  </Button>
+                        {/* Status + Actions */}
+                        <div className="flex items-center gap-2 shrink-0 pl-13 sm:pl-0">
+                          {/* Status badge */}
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
+                            <StatusIcon status={d.status} isProcessing={statusInfo.isProcessing} />
+                            {statusInfo.text}
+                          </span>
+
+                          {/* Save file button */}
+                          {isCompleted && (
+                            <a
+                              href={getDownloadUrl(d.id, d.downloadToken)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-all shadow-sm shadow-green-500/20 active:scale-95"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Save File
+                            </a>
+                          )}
+
+                          {/* Retry button */}
+                          {isFailed && d.retryCount < 3 && (
+                            <button
+                              onClick={() => handleRetry(d.id)}
+                              disabled={retryingId === d.id}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-accent text-foreground transition-all disabled:opacity-50"
+                            >
+                              <RotateCcw className={`w-3.5 h-3.5 ${retryingId === d.id ? "animate-spin" : ""}`} />
+                              {retryingId === d.id ? "Retrying..." : "Retry"}
+                            </button>
+                          )}
+
+                          {/* Details button */}
+                          <Link
+                            to={routes.DownloadDetailRoute.build({ params: { id: d.id } }) as any}
+                            className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+                          >
+                            Details
+                            <ChevronRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && downloads.length > 0 && (
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+            <span className="text-xs text-muted-foreground font-semibold">Page {page} of {totalPages}</span>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                variant="outline"
+                size="sm"
+                className="rounded-xl text-xs font-bold border-border h-8 px-3"
+              >
+                <span className="hidden sm:inline">← Previous</span>
+                <span className="sm:hidden">←</span>
+              </Button>
+              <Button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                variant="outline"
+                size="sm"
+                className="rounded-xl text-xs font-bold border-border h-8 px-3"
+              >
+                <span className="hidden sm:inline">Next →</span>
+                <span className="sm:hidden">→</span>
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

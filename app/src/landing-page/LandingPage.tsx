@@ -6,8 +6,7 @@ import HowItWorks from "./components/HowItWorks";
 import FeaturesGrid from "./components/FeaturesGrid";
 import Testimonials from "./components/Testimonials";
 import FAQ from "./components/FAQ";
-import Footer from "./components/Footer";
-import { features, testimonials, faqs, footerNavigation } from "./contentSections";
+import { features, testimonials, faqs } from "./contentSections";
 
 export default function LandingPage() {
   const { data: user, isLoading } = useAuth();
@@ -35,7 +34,6 @@ export default function LandingPage() {
       <FeaturesGrid features={features} />
       <Testimonials testimonials={testimonials} />
       <FAQ faqs={faqs} />
-      <Footer footerNavigation={footerNavigation} />
     </div>
   );
 }

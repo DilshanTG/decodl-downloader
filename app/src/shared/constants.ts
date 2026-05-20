@@ -58,17 +58,17 @@ export const CREDIT_PACKAGES = [
 export type PackageId = 'single' | 'starter' | 'value' | 'pro' | 'business' | 'agency'
 
 export const DOWNLOAD_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  processing: 'Processing',
-  completed: 'Completed',
-  failed: 'Failed',
-  refunded: 'Refunded',
+  pending: 'Getting Ready',
+  processing: 'In Progress',
+  completed: 'Ready to Download',
+  failed: 'Download Failed',
+  refunded: 'Credits Returned',
 }
 
 export const DOWNLOAD_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  processing: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  refunded: 'bg-gray-100 text-gray-800',
+  pending:    'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
+  processing: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  completed:  'bg-green-500/10 text-green-600 dark:text-green-400',
+  failed:     'bg-red-500/10 text-red-600 dark:text-red-400',
+  refunded:   'bg-muted text-muted-foreground',
 }

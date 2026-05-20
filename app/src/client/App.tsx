@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Outlet, useLocation } from "react-router";
+import { useAuth } from "wasp/client/auth";
 import { routes } from "wasp/client/router";
 import { Toaster } from "../client/components/ui/toaster";
 import "./Main.css";
@@ -9,6 +10,8 @@ import {
   marketingNavigationItems,
 } from "./components/NavBar/constants";
 import CookieConsentBanner from "./components/cookie-consent/Banner";
+import Footer from "../landing-page/components/Footer";
+import { footerNavigation } from "../landing-page/contentSections";
 
 function WhatsAppButton() {
   return (
@@ -33,15 +36,15 @@ function WhatsAppButton() {
  */
 export default function App() {
   const location = useLocation();
-  const isMarketingPage = useMemo(() => {
-    return (
-      location.pathname === "/" || location.pathname.startsWith("/pricing")
-    );
-  }, [location]);
+  const { data: user } = useAuth();
 
-  const navigationItems = isMarketingPage
-    ? marketingNavigationItems
-    : appNavigationItems;
+  const isLandingPage = location.pathname === "/";
+
+  // Logged-in users always get app nav. Guests only get marketing nav on landing page.
+  const navigationItems = useMemo(() => {
+    if (user) return appNavigationItems;
+    return isLandingPage ? marketingNavigationItems : appNavigationItems;
+  }, [user, isLandingPage]);
 
   const shouldDisplayAppNavBar = useMemo(() => {
     return (
@@ -76,7 +79,7 @@ export default function App() {
 
   return (
     <>
-      <div className="bg-background text-foreground min-h-screen">
+      <div className="bg-background text-foreground min-h-screen pb-16 sm:pb-0">
         {isAdminDashboard ? (
           <Outlet />
         ) : isAuthPage ? (
@@ -89,6 +92,7 @@ export default function App() {
             <div className="mx-auto max-w-(--breakpoint-2xl)">
               <Outlet />
             </div>
+            <Footer footerNavigation={footerNavigation} />
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
-import { type GetMyDownloads, type GetDownloadById, type SubmitDownload, type RetryFailedDownload, type GetAssetInfo } from 'wasp/server/operations'
+import { type GetMyDownloads, type GetDownloadById, type SubmitDownload, type RetryFailedDownload, type GetAssetInfo, type GetDecodlBalance } from 'wasp/server/operations'
 import { HttpError } from 'wasp/server'
 import { processDecodlSubmission } from 'wasp/server/jobs'
-import { detectProviderFromUrl, getDecodlAssetInfo } from '../decodl/client'
+import { detectProviderFromUrl, getDecodlAssetInfo, fetchDecodlBalance } from '../decodl/client'
 
 type GetMyDownloadsInput = { page?: number; status?: string; providerSlug?: string }
 type GetMyDownloadsOutput = { downloads: any[]; total: number; page: number; totalPages: number }
@@ -93,19 +93,21 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   })
   if (!pricing) throw new HttpError(404, `Provider "${resolvedSlug}" (${resolvedVariant}) not found or inactive.`)
 
-  // Sandbox providers skip asset info lookup and credit logic entirely.
-  // Identified by slug name, not creditCost — so admin price changes can't accidentally enable billing.
-  const SANDBOX_SLUGS = new Set(['lorempicsum'])
+  const SANDBOX_SLUGS = new Set<string>([])
   const isSandbox = SANDBOX_SLUGS.has(resolvedSlug)
 
   // Credit cost = max(our DB price, Decodl's actual cost for this asset).
   // We call Decodl /info to get their real cost so the charge matches what the user saw in the preview.
   // Falls back to our DB price if Decodl /info is unavailable (fail-safe).
-  let creditCost = pricing.creditCost
+  // Hard cap: never charge more than 500 credits per download regardless of what Decodl reports.
+  // Max legitimate price in our DB is 95 cr (Shutterstock 4K Select) — 500 gives headroom
+  // while still blocking wildly wrong values (9999+) if Decodl API is ever compromised.
+  const MAX_CREDIT_COST = 500
+  let creditCost = Math.min(pricing.creditCost, MAX_CREDIT_COST)
   if (!isSandbox) {
     try {
       const assetInfo = await getDecodlAssetInfo({ link, code, providerName: resolvedSlug, options })
-      creditCost = parseFloat(Math.max(pricing.creditCost, assetInfo.ratio).toFixed(2))
+      creditCost = parseFloat(Math.min(Math.max(pricing.creditCost, assetInfo.ratio), MAX_CREDIT_COST).toFixed(2))
     } catch {
       // Decodl /info failed — fall back to our DB price, which is always safe to charge
     }
@@ -334,4 +336,21 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
       error: 'Could not fetch live asset info. Default pricing will be used.',
     }
   }
+}
+
+// Cached Decodl balance — re-fetches at most once per 2 minutes server-side
+let decodlBalanceCache: { balance: number; fetchedAt: number } | null = null
+const BALANCE_CACHE_MS = 2 * 60 * 1000
+
+export const getDecodlBalance: GetDecodlBalance<void, { balance: number; available: boolean }> = async (_args, context) => {
+  if (!context.user) throw new HttpError(401)
+
+  const now = Date.now()
+  if (decodlBalanceCache && now - decodlBalanceCache.fetchedAt < BALANCE_CACHE_MS) {
+    return { balance: decodlBalanceCache.balance, available: decodlBalanceCache.balance !== -1 }
+  }
+
+  const result = await fetchDecodlBalance()
+  decodlBalanceCache = { balance: result.balance, fetchedAt: now }
+  return result
 }

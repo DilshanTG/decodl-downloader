@@ -68,23 +68,29 @@ export const testimonials = [
   {
     name: "Pradeep Kumara",
     role: "Freelance Creative Designer",
-    avatarSrc: daBoiAvatar,
+    avatarSrc: "",
+    initials: "PK",
+    avatarColor: "bg-purple-500",
     socialUrl: "",
     quote: "StockMart has been an absolute game-changer. I no longer have to pay high USD markup rates or worry about credit card blocks. I just buy credits in LKR and get my vectors instantly.",
   },
   {
     name: "Dilini Senanayake",
     role: "Agency Art Director",
-    avatarSrc: daBoiAvatar,
+    avatarSrc: "",
+    initials: "DS",
+    avatarColor: "bg-orange-500",
     socialUrl: "",
     quote: "Downloading premium Envato and Shutterstock assets for client pitches is now incredibly cheap and fast. The auto-refund feature on failed jobs gives us complete peace of mind.",
   },
   {
     name: "Kasun Jayawardena",
     role: "UI/UX & Video Editor",
-    avatarSrc: daBoiAvatar,
+    avatarSrc: "",
+    initials: "KJ",
+    avatarColor: "bg-blue-500",
     socialUrl: "",
-    quote: "No subscription trap! I buy the Rs. 4,500 package, edit my videos using high-res iStock and Adobe Stock footage, and only top-up when the next project comes in.",
+    quote: "No subscription trap! I buy credits in bulk, edit my videos using high-res iStock and Adobe Stock footage, and only top-up when the next project comes in.",
   },
 ];
 
@@ -118,18 +124,17 @@ export const faqs = [
 
 export const footerNavigation = {
   app: [
-    { name: "Pricing", href: "/pricing" },
-    { name: "Login", href: "/login" },
-    { name: "Sign Up", href: "/signup" },
+    { name: "Dashboard", href: "/dashboard" },
+    { name: "Download History", href: "/history" },
+    { name: "Pricing & Credits", href: "/pricing" },
     { name: "Refund Policy", href: "/refund-policy" },
     { name: "Privacy Policy", href: "/privacy" },
     { name: "Terms of Service", href: "/terms" },
   ],
   company: [
     { name: "DigiMart Solutions (Pvt) Ltd", href: "https://digimartsolutions.lk" },
-    { name: "WhatsApp Support", href: "https://wa.me/94772503124" },
+    { name: "💬 WhatsApp Support", href: "https://wa.me/94772503124" },
     { name: "support@stockmart.lk", href: "mailto:support@stockmart.lk" },
-    { name: "Refund Policy", href: "/refund-policy" },
   ],
 };
 

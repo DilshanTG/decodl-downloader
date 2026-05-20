@@ -105,7 +105,7 @@ export default function AccountPage({ user }: { user: User }) {
                       Claimed
                     </span>
                   ) : (
-                    <span className="text-amber-500 animate-pulse font-semibold">Not claimed — go to Dashboard to claim</span>
+                    <span className="text-amber-500 font-semibold">Not claimed — <Link to={routes.DashboardRoute.to} className="underline hover:text-amber-600">claim on Dashboard</Link></span>
                   )}
                 </dd>
               </div>

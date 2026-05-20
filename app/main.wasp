@@ -161,6 +161,11 @@ query getAssetInfo {
   entities: [User, ProviderPricing]
 }
 
+query getDecodlBalance {
+  fn: import { getDecodlBalance } from "@src/downloads/operations",
+  entities: []
+}
+
 action submitDownload {
   fn: import { submitDownload } from "@src/downloads/operations",
   entities: [User, Download, CreditTransaction, ProviderPricing]

@@ -17,6 +17,7 @@ function sanitize(name: string) {
 // so the customer only ever sees our domain, never Decodl's.
 export const downloadFile = async (req: Request, res: Response, context: any) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+  const token = req.query.token as string | undefined
 
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!id || !uuidRegex.test(id)) return res.status(400).send('Invalid ID.')
@@ -25,6 +26,9 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
   if (!download) return res.status(404).send('Not found.')
   if (download.status !== 'completed' || !download.downloadUrl) return res.status(400).send('Not ready.')
   if (download.expiresAt && new Date(download.expiresAt) < new Date()) return res.status(410).send('Expired.')
+
+  // Verify ownership token — prevents IDOR (downloading another user's paid file)
+  if (!token || token !== download.downloadToken) return res.status(403).send('Forbidden.')
 
   try {
     const parsed = new URL(download.downloadUrl)

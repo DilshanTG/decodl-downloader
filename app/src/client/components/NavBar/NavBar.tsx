@@ -1,6 +1,6 @@
 import { LogIn, Menu } from "lucide-react";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { Link as ReactRouterLink } from "react-router";
+import { Link as ReactRouterLink, NavLink } from "react-router";
 import { useAuth } from "wasp/client/auth";
 import { useQuery } from "wasp/client/operations";
 import { getMyCreditBalance } from "wasp/client/operations";
@@ -24,6 +24,7 @@ import { Announcement } from "./Announcement";
 export interface NavigationItem {
   name: string;
   to: string;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 export default function NavBar({
@@ -84,7 +85,7 @@ export default function NavBar({
 }
 
 function NavBarCreditSection() {
-  const { data: balanceData } = useQuery(getMyCreditBalance);
+  const { data: balanceData } = useQuery(getMyCreditBalance, undefined, { staleTime: 10000, refetchInterval: 30000 });
   const creditBalance = balanceData?.available ?? (balanceData as any)?.credits ?? 0;
 
   return (
@@ -93,7 +94,7 @@ function NavBarCreditSection() {
         <span className="text-muted-foreground font-medium">Balance:</span>
         <span className="font-black text-primary tabular-nums">
           {typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"}
-          <span className="text-xs font-bold text-muted-foreground ml-0.5">cr</span>
+          <span className="text-xs font-bold text-muted-foreground ml-0.5">credits</span>
         </span>
       </div>
       <WaspRouterLink
@@ -215,24 +216,81 @@ function renderNavigationItems(
   navigationItems: NavigationItem[],
   setMobileMenuOpen?: Dispatch<SetStateAction<boolean>>,
 ) {
-  const menuStyles = cn({
-    "block rounded-lg px-3 py-2 text-sm font-medium leading-7 text-foreground hover:bg-accent hover:text-accent-foreground transition-colors":
-      !!setMobileMenuOpen,
-    "text-sm font-normal leading-6 text-foreground duration-300 ease-in-out hover:text-primary transition-colors":
-      !setMobileMenuOpen,
-  });
-
   return navigationItems.map((item) => {
+    const Icon = item.icon;
+    const isExternal = item.to.startsWith("http");
+
+    if (isExternal) {
+      return (
+        <li key={item.name}>
+          <a
+            href={item.to}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "group flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200",
+              setMobileMenuOpen
+                ? "w-full px-3 py-2.5 text-foreground hover:bg-accent"
+                : "px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/40"
+            )}
+            onClick={setMobileMenuOpen && (() => setMobileMenuOpen(false))}
+          >
+            {Icon && (
+              <Icon
+                className={cn(
+                  "w-4.5 h-4.5 shrink-0 transition-transform group-hover:scale-110",
+                  setMobileMenuOpen
+                    ? "text-muted-foreground"
+                    : "text-muted-foreground/75 group-hover:text-primary"
+                )}
+              />
+            )}
+            <span>{item.name}</span>
+          </a>
+        </li>
+      );
+    }
+
     return (
       <li key={item.name}>
-        <ReactRouterLink
+        <NavLink
           to={item.to}
-          className={menuStyles}
           onClick={setMobileMenuOpen && (() => setMobileMenuOpen(false))}
-          target={item.to.startsWith("http") ? "_blank" : undefined}
+          className={({ isActive }) =>
+            cn(
+              "group flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200",
+              setMobileMenuOpen
+                ? cn(
+                    "w-full px-3 py-2.5",
+                    isActive
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-foreground hover:bg-accent"
+                  )
+                : cn(
+                    "px-3 py-1.5",
+                    isActive
+                      ? "text-primary bg-primary/8 font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                  )
+            )
+          }
         >
-          {item.name}
-        </ReactRouterLink>
+          {({ isActive }) => (
+            <>
+              {Icon && (
+                <Icon
+                  className={cn(
+                    "w-4.5 h-4.5 shrink-0 transition-transform group-hover:scale-110",
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground/75 group-hover:text-primary"
+                  )}
+                />
+              )}
+              <span>{item.name}</span>
+            </>
+          )}
+        </NavLink>
       </li>
     );
   });

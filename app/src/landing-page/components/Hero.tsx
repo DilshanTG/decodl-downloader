@@ -130,7 +130,7 @@ export default function Hero() {
                 to={routes.SignupRoute.to}
                 className="inline-flex items-center justify-center rounded-xl px-6 py-3 font-bold text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity whitespace-nowrap"
               >
-                Try Free →
+                Sign Up Free →
               </WaspRouterLink>
             </div>
 
@@ -164,7 +164,7 @@ export default function Hero() {
           {[
             { value: "20+", label: "Premium Providers" },
             { value: "LKR", label: "Local Currency Only" },
-            { value: "24/7", label: "Auto Download & Refund" },
+            { value: "Auto", label: "Refund on Failure" },
           ].map(stat => (
             <div key={stat.label} className="text-center">
               <p className="text-3xl sm:text-4xl font-black text-primary">{stat.value}</p>

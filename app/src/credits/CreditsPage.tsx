@@ -12,7 +12,7 @@ const TYPE_CONFIG: Record<TxType | string, {
   label: string; bgColor: string; textColor: string; icon: ReactElement;
 }> = {
   purchase: {
-    label: "Top Up",
+    label: "Credits Added",
     bgColor: "bg-green-500/10",
     textColor: "text-green-600 dark:text-green-400",
     icon: (
@@ -22,7 +22,7 @@ const TYPE_CONFIG: Record<TxType | string, {
     ),
   },
   download: {
-    label: "Download",
+    label: "File Downloaded",
     bgColor: "bg-primary/10",
     textColor: "text-primary",
     icon: (
@@ -32,7 +32,7 @@ const TYPE_CONFIG: Record<TxType | string, {
     ),
   },
   refund: {
-    label: "Refund",
+    label: "Credits Returned",
     bgColor: "bg-blue-500/10",
     textColor: "text-blue-600 dark:text-blue-400",
     icon: (
@@ -42,7 +42,7 @@ const TYPE_CONFIG: Record<TxType | string, {
     ),
   },
   bonus: {
-    label: "Bonus",
+    label: "Welcome Bonus",
     bgColor: "bg-secondary/10",
     textColor: "text-secondary",
     icon: (
@@ -65,7 +65,7 @@ const TYPE_CONFIG: Record<TxType | string, {
 
 const TYPE_FILTERS = [
   { value: "", label: "All" },
-  { value: "purchase", label: "Top Ups" },
+  { value: "purchase", label: "Credits Bought" },
   { value: "download", label: "Downloads" },
   { value: "refund", label: "Refunds" },
   { value: "bonus", label: "Bonuses" },
@@ -142,7 +142,7 @@ export default function CreditsPage() {
           {[
             {
               label: "Current Balance",
-              value: `${typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"} cr`,
+              value: `${typeof creditBalance === "number" ? creditBalance.toFixed(1) : "—"} credits`,
               color: "text-primary",
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +152,7 @@ export default function CreditsPage() {
             },
             {
               label: "Purchased",
-              value: `+${totalPurchased.toFixed(1)} cr`,
+              value: `+${totalPurchased.toFixed(1)} credits`,
               color: "text-green-600 dark:text-green-400",
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +162,7 @@ export default function CreditsPage() {
             },
             {
               label: "Spent",
-              value: `-${totalSpent.toFixed(1)} cr`,
+              value: `-${totalSpent.toFixed(1)} credits`,
               color: "text-primary",
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +172,7 @@ export default function CreditsPage() {
             },
             {
               label: "Refunded",
-              value: `+${totalRefunded.toFixed(1)} cr`,
+              value: `+${totalRefunded.toFixed(1)} credits`,
               color: "text-blue-600 dark:text-blue-400",
               icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +227,8 @@ export default function CreditsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <p className="text-muted-foreground text-sm font-medium">No transactions yet</p>
+                <p className="text-muted-foreground text-sm font-medium">No activity yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Purchases, downloads and refunds will appear here</p>
                 {typeFilter ? (
                   <button onClick={() => setTypeFilter("")} className="text-primary text-xs hover:underline mt-1">
                     Clear filter
@@ -237,7 +238,7 @@ export default function CreditsPage() {
                     to={routes.DashboardRoute.to}
                     className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-primary hover:underline"
                   >
-                    Download your first asset →
+                    Go to Dashboard →
                   </Link>
                 )}
               </div>
@@ -265,11 +266,11 @@ export default function CreditsPage() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {tx.description || (
-                            tx.type === "purchase" ? "Credit package purchase" :
-                            tx.type === "download" ? "Asset download" :
-                            tx.type === "refund" ? "Download failed — auto refund" :
-                            tx.type === "bonus" ? "Welcome bonus credits" :
-                            "Account adjustment"
+                            tx.type === "purchase" ? "Credits added to your account" :
+                            tx.type === "download" ? "Credits used for this download" :
+                            tx.type === "refund" ? "Download failed · Credits returned automatically" :
+                            tx.type === "bonus" ? "Free welcome credits — no purchase needed" :
+                            "Account adjustment by support"
                           )}
                         </p>
                         <p className="text-[10px] text-muted-foreground/60 mt-0.5">

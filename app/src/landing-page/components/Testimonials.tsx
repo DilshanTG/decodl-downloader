@@ -12,6 +12,8 @@ interface Testimonial {
   name: string;
   role: string;
   avatarSrc: string;
+  initials?: string;
+  avatarColor?: string;
   socialUrl: string;
   quote: string;
 }
@@ -45,12 +47,18 @@ export default function Testimonials({
                   href={testimonial.socialUrl}
                   className="group flex w-full items-center gap-x-3 transition-all duration-200 hover:opacity-80"
                 >
-                  <img
-                    src={testimonial.avatarSrc}
-                    loading="lazy"
-                    alt={`${testimonial.name}'s avatar`}
-                    className="ring-border/20 group-hover:ring-primary/30 h-10 w-10 shrink-0 rounded-full ring-2 transition-all duration-200"
-                  />
+                  {testimonial.avatarSrc ? (
+                    <img
+                      src={testimonial.avatarSrc}
+                      loading="lazy"
+                      alt={`${testimonial.name}'s avatar`}
+                      className="ring-border/20 group-hover:ring-primary/30 h-10 w-10 shrink-0 rounded-full ring-2 transition-all duration-200"
+                    />
+                  ) : (
+                    <div className={`h-10 w-10 shrink-0 rounded-full ring-2 ring-border/20 flex items-center justify-center text-white font-bold text-sm ${testimonial.avatarColor || "bg-primary"}`}>
+                      {testimonial.initials || testimonial.name.charAt(0)}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <CardTitle className="group-hover:text-card-foreground truncate text-sm font-semibold transition-colors duration-200">
                       {testimonial.name}

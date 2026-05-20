@@ -54,6 +54,9 @@ model Download {
   retryCount    Int       @default(0)
   errorMessage  String?
   lastPolledAt  DateTime?
+  downloadToken String @default(dbgenerated("(gen_random_uuid())::text"))
+
+  @@index([userId, status, createdAt])
 }
 
 model CreditTransaction {
@@ -85,6 +88,8 @@ model Payment {
   creditsAwarded    Float
   status            String    @default("pending")  // pending|paid|failed|cancelled|refunded
   rawPayload        Json?
+
+  @@index([userId, status])
 }
 
 model ProviderPricing {

@@ -121,11 +121,6 @@ export default function RefundPolicyPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border mt-16 py-8 text-center text-xs text-muted-foreground">
-        © 2026 StockMart.lk — DigiMart Solutions (Pvt) Ltd ·{" "}
-        <a href="/refund-policy" className="hover:text-foreground underline">Refund Policy</a>
-      </footer>
     </div>
   );
 }

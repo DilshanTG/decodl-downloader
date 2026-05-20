@@ -60,57 +60,55 @@ const DIGIMART_BASE      = 'https://pay.digimartsolutions.lk'
 export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; reservedCredits: number; available: number }> = async (_args, context) => {
   if (!context.user) throw new HttpError(401)
 
+  const userId = context.user.id
+
   const pendingPayments = await context.entities.Payment.findMany({
-    where: { userId: context.user.id, status: 'pending' },
+    where: { userId, status: 'pending' },
   })
 
   if (pendingPayments.length > 0) {
     const merchantKey = process.env.PAYHERE_MERCHANT_KEY!
 
-    for (const payment of pendingPayments) {
-      const ageMs      = Date.now() - new Date(payment.createdAt).getTime()
-      const updatedMs  = Date.now() - new Date(payment.updatedAt).getTime()
+    await Promise.all(pendingPayments.map(async (payment) => {
+      const ageMs     = Date.now() - new Date(payment.createdAt).getTime()
+      const updatedMs = Date.now() - new Date(payment.updatedAt).getTime()
 
-      // Skip: too old (likely abandoned)
       if (ageMs > SYNC_MAX_AGE_MS) {
         await context.entities.Payment.update({
           where: { id: payment.id },
           data: { status: 'cancelled', updatedAt: new Date() },
         })
-        continue
+        return
       }
-      // Skip if checked recently — but always check brand-new payments (updatedAt == createdAt)
       const isNeverChecked = Math.abs(payment.updatedAt.getTime() - payment.createdAt.getTime()) < 5000
-      if (!isNeverChecked && updatedMs < SYNC_COOLDOWN_MS) continue
+      if (!isNeverChecked && updatedMs < SYNC_COOLDOWN_MS) return
 
       try {
         const res = await fetch(`${DIGIMART_BASE}/api/v1/status/${payment.payhereOrderId}`, {
           headers: { Authorization: `Bearer ${merchantKey}` },
-          signal: AbortSignal.timeout(5000), // 5s timeout — don't block the balance response
+          signal: AbortSignal.timeout(5000),
         })
 
-        if (!res.ok) continue
+        if (!res.ok) return
 
         const body      = await res.json() as { status: string; data: { status: string } }
         const apiStatus = body?.data?.status ?? null
 
         if (apiStatus === 'SUCCESS') {
-          // Atomic check-and-set: only credit if payment hasn't been processed yet.
-          // Prevents double-credit when webhook and balance-sync run simultaneously.
           const syncClaimed = await context.entities.Payment.updateMany({
             where: { id: payment.id, status: 'pending' },
             data: { status: 'paid', updatedAt: new Date() },
           })
-          if (syncClaimed.count === 0) continue // already processed by webhook — skip
+          if (syncClaimed.count === 0) return
 
-          const dbUser = await context.entities.User.findUnique({ where: { id: context.user.id } })
-          if (!dbUser) continue
+          const dbUser = await context.entities.User.findUnique({ where: { id: userId } })
+          if (!dbUser) return
 
           const estimatedBalance = dbUser.credits + payment.creditsAwarded
 
           await Promise.all([
             context.entities.User.update({
-              where: { id: context.user.id },
+              where: { id: userId },
               data: {
                 credits: { increment: payment.creditsAwarded },
                 lifetimeCreditsEarned: { increment: payment.creditsAwarded },
@@ -119,7 +117,7 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
             }),
             context.entities.CreditTransaction.create({
               data: {
-                userId: context.user.id,
+                userId,
                 amount: payment.creditsAwarded,
                 balance: estimatedBalance,
                 type: 'purchase',
@@ -129,7 +127,7 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
             }),
           ])
 
-          console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${context.user.id}`)
+          console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${userId}`)
 
         } else if (apiStatus === 'FAILED' || apiStatus === 'CANCELLED') {
           await context.entities.Payment.update({
@@ -137,7 +135,6 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
             data: { status: apiStatus === 'FAILED' ? 'failed' : 'cancelled', updatedAt: new Date() },
           })
         } else {
-          // Still pending — just update timestamp to reset cooldown clock
           await context.entities.Payment.update({
             where: { id: payment.id },
             data: { updatedAt: new Date() },
@@ -146,11 +143,11 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
       } catch (err) {
         console.error('[Balance sync] DigiMart status check failed:', err)
       }
-    }
+    }))
   }
 
   const user = await context.entities.User.findUnique({
-    where: { id: context.user.id },
+    where: { id: userId },
     select: { credits: true, reservedCredits: true },
   })
 

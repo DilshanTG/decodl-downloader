@@ -81,6 +81,13 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
       return res.status(200).send('Already processed')
     }
 
+    // Cross-validate webhook amount against stored payment amount (defence-in-depth)
+    const webhookAmount = parseFloat(data.amount || data.payhere_amount || '0')
+    if (Math.abs(webhookAmount - payment.amountLKR) > 1) {
+      console.error(`Webhook: amount mismatch for order ${order_id} — webhook: ${webhookAmount}, stored: ${payment.amountLKR}`)
+      return res.status(400).send('Amount mismatch')
+    }
+
     // Determine status: prefer webhook status_code, fall back to GET /status
     let resolvedStatus = 'unknown'
 

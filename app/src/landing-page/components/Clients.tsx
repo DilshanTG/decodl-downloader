@@ -56,7 +56,7 @@ function MarqueeRow({ providers, reverse = false }: { providers: typeof PROVIDER
 
 export default function Clients() {
   return (
-    <section className="py-16 border-y border-border/50 bg-card/20 overflow-hidden">
+    <section id="providers" className="py-16 border-y border-border/50 bg-card/20 overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 lg:px-8 mb-8">
         <p className="text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
           Download from 20+ premium asset providers

@@ -271,6 +271,29 @@ const URL_PATTERNS: Array<{ pattern: RegExp; slug: string }> = [
   { pattern: /vexels\.com/, slug: 'vexels' },
 ]
 
+export interface DecodlBalanceResult {
+  balance: number
+  available: boolean
+}
+
+export async function fetchDecodlBalance(): Promise<DecodlBalanceResult> {
+  try {
+    const { response, data } = await fetchWithFallback(
+      (domain) => `${domain}/api/balance`,
+      { method: 'GET', headers: getHeaders() },
+    )
+    if (!response.ok) throw new Error('balance endpoint error')
+    const balance = typeof data.balance === 'number' ? data.balance
+      : typeof data.credit === 'number' ? data.credit
+      : typeof data.credits === 'number' ? data.credits
+      : typeof data.amount === 'number' ? data.amount
+      : -1
+    return { balance, available: balance !== -1 }
+  } catch {
+    return { balance: -1, available: false }
+  }
+}
+
 export function detectProviderFromUrl(url: string): string | null {
   for (const { pattern, slug } of URL_PATTERNS) {
     if (pattern.test(url)) return slug
