@@ -66,9 +66,9 @@ export const DOWNLOAD_STATUS_LABELS: Record<string, string> = {
 }
 
 export const DOWNLOAD_STATUS_COLORS: Record<string, string> = {
-  pending:    'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
-  processing: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  completed:  'bg-green-500/10 text-green-600 dark:text-green-400',
-  failed:     'bg-red-500/10 text-red-600 dark:text-red-400',
-  refunded:   'bg-muted text-muted-foreground',
+  pending:    'badge-premium badge-premium-pending',
+  processing: 'badge-premium badge-premium-processing',
+  completed:  'badge-premium badge-premium-completed',
+  failed:     'badge-premium badge-premium-failed',
+  refunded:   'badge-premium badge-premium-refunded',
 }

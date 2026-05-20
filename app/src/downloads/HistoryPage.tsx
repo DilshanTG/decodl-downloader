@@ -42,19 +42,19 @@ function groupByDate(downloads: any[]): { label: string; items: any[] }[] {
 }
 
 function StatusIcon({ status, isProcessing }: { status: string; isProcessing: boolean }) {
-  if (isProcessing) return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
-  if (status === "completed") return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-  if (status === "failed") return <XCircle className="w-4 h-4 text-red-500" />;
-  if (status === "refunded") return <RotateCcw className="w-4 h-4 text-muted-foreground" />;
-  return <Clock className="w-4 h-4 text-yellow-500" />;
+  if (isProcessing) return <Loader2 className="w-3.5 h-3.5 animate-spin" />;
+  if (status === "completed") return <CheckCircle2 className="w-3.5 h-3.5" />;
+  if (status === "failed") return <XCircle className="w-3.5 h-3.5" />;
+  if (status === "refunded") return <RotateCcw className="w-3.5 h-3.5" />;
+  return <Clock className="w-3.5 h-3.5" />;
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending:    "text-yellow-600 bg-yellow-500/10",
-  processing: "text-blue-600 bg-blue-500/10",
-  completed:  "text-green-600 bg-green-500/10",
-  failed:     "text-red-600 bg-red-500/10",
-  refunded:   "text-muted-foreground bg-muted",
+  pending:    "badge-premium badge-premium-pending",
+  processing: "badge-premium badge-premium-processing",
+  completed:  "badge-premium badge-premium-completed",
+  failed:     "badge-premium badge-premium-failed",
+  refunded:   "badge-premium badge-premium-refunded",
 };
 
 const STATUS_FILTERS = [
@@ -67,14 +67,14 @@ const STATUS_FILTERS = [
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse flex items-center gap-4 p-4 rounded-2xl border border-border bg-card">
-      <div className="w-10 h-10 rounded-xl bg-muted shrink-0" />
+    <div className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card">
+      <div className="skeleton-shimmer w-10 h-10 rounded-xl shrink-0" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 bg-muted rounded w-32" />
-        <div className="h-3 bg-muted rounded w-20" />
+        <div className="skeleton-shimmer h-4 rounded w-32" />
+        <div className="skeleton-shimmer h-3 rounded w-20" />
       </div>
-      <div className="h-6 bg-muted rounded-full w-20" />
-      <div className="h-8 bg-muted rounded-lg w-20" />
+      <div className="skeleton-shimmer h-6 rounded-full w-20" />
+      <div className="skeleton-shimmer h-8 rounded-lg w-20" />
     </div>
   );
 }
@@ -292,7 +292,7 @@ export default function HistoryPage() {
                         {/* Status + Actions */}
                         <div className="flex items-center gap-2 shrink-0 pl-13 sm:pl-0">
                           {/* Status badge */}
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${statusInfo.colorClass}`}>
+                          <span className={statusInfo.colorClass}>
                             <StatusIcon status={d.status} isProcessing={statusInfo.isProcessing} />
                             {statusInfo.text}
                           </span>

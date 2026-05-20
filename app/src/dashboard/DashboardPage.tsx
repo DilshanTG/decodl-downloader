@@ -95,11 +95,11 @@ async function showNotification(title: string, body: string) {
 
 function SkeletonRow() {
  return (
- <div className= "animate-pulse flex items-center gap-4 py-4 border-b border-border">
- <div className= "h-4 bg-muted rounded w-24"></div>
- <div className= "h-4 bg-muted rounded w-32 flex-1"></div>
- <div className= "h-5 bg-muted rounded-full w-20"></div>
- <div className= "h-4 bg-muted rounded w-12"></div>
+ <div className="flex items-center gap-4 py-4 border-b border-border">
+ <div className="skeleton-shimmer h-4 rounded w-24"></div>
+ <div className="skeleton-shimmer h-4 rounded w-32 flex-1"></div>
+ <div className="skeleton-shimmer h-5 rounded-full w-20"></div>
+ <div className="skeleton-shimmer h-4 rounded w-12"></div>
  </div>
  );
 }
@@ -713,29 +713,36 @@ export default function DashboardPage() {
  </CardHeader>
  <CardContent className= "p-0">
  {/* Tabs Selector */}
- <div className= "flex gap-4 mb-6 border-b border-border pb-3">
+ <div className="relative mb-6 bg-muted/65 p-1 rounded-xl flex w-full sm:w-fit border border-border/50">
+ <div
+ className="absolute top-1 bottom-1 left-1 rounded-lg bg-card shadow-sm border border-border/20 transition-all duration-300 ease-out"
+ style={{
+ width: "calc(50% - 4px)",
+ transform: activeTab === "single" ? "translateX(0)" : "translateX(calc(100% + 4px))",
+ }}
+ />
  <button
- type= "button"
+ type="button"
  onClick={() => setActiveTab("single")}
- className={`pb-2 px-1 font-bold text-xs uppercase tracking-wider border-b-2 transition-all ${
+ className={`relative z-10 flex-1 sm:flex-initial text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
  activeTab === "single"
- ?"border-primary text-foreground"
- : "border-transparent text-muted-foreground hover:text-foreground"
+ ? "text-foreground font-extrabold"
+ : "text-muted-foreground hover:text-foreground"
  }`}
  >
  One File
  </button>
  <button
- type= "button"
+ type="button"
  onClick={() => setActiveTab("bulk")}
- className={`pb-2 px-1 font-bold text-xs uppercase tracking-wider border-b-2 transition-all ${
+ className={`relative z-10 flex-1 sm:flex-initial text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
  activeTab === "bulk"
- ?"border-primary text-foreground"
- : "border-transparent text-muted-foreground hover:text-foreground"
+ ? "text-foreground font-extrabold"
+ : "text-muted-foreground hover:text-foreground"
  }`}
  >
  Multiple Files
- <span className= "ml-1.5 normal-case text-[9px] font-semibold text-muted-foreground">(up to 5 at once)</span>
+ <span className="ml-1.5 normal-case text-[9px] font-bold text-muted-foreground/80">(max 5)</span>
  </button>
  </div>
 
@@ -890,162 +897,168 @@ export default function DashboardPage() {
  const providerLabel = (pricingData as any[])?.find((p: any) => p.slug === detectedSlug)?.displayName || detectedSlug ||"";
 
  const Dot = ({ s }: { s: string }) => {
- if (s === "loading") return (
- <div className= "w-8 h-8 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center shrink-0">
- <svg className= "animate-spin w-3.5 h-3.5 text-primary"fill= "none"viewBox= "0 0 24 24">
- <circle className= "opacity-25"cx= "12"cy= "12"r= "10"stroke= "currentColor"strokeWidth= "4"/>
- <path className= "opacity-75"fill= "currentColor"d= "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
- </svg>
- </div>
- );
- if (s === "success") return (
- <div className= "w-8 h-8 rounded-full bg-green-500/15 border-2 border-green-500/40 flex items-center justify-center shrink-0">
- <svg className= "w-3.5 h-3.5 text-green-500"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M5 13l4 4L19 7"/>
- </svg>
- </div>
- );
- if (s === "warning"|| s === "editorial") return (
- <div className= "w-8 h-8 rounded-full bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center shrink-0">
- <svg className= "w-3.5 h-3.5 text-amber-500"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2} d= "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
- </svg>
- </div>
- );
- if (s === "error"|| s === "not-found") return (
- <div className= "w-8 h-8 rounded-full bg-red-500/15 border-2 border-red-500/40 flex items-center justify-center shrink-0">
- <svg className= "w-3.5 h-3.5 text-red-500"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M6 18L18 6M6 6l12 12"/>
- </svg>
- </div>
- );
- return (
- <div className= "w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center shrink-0">
- <div className= "w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/>
- </div>
- );
- };
+    if (s === "loading") return (
+      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(107,0,246,0.15)]">
+        <svg className="animate-spin w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </div>
+    );
+    if (s === "success") return (
+      <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(34,197,94,0.15)]">
+        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+    );
+    if (s === "warning" || s === "editorial") return (
+      <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.15)]">
+        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+      </div>
+    );
+    if (s === "error" || s === "not-found") return (
+      <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.15)]">
+        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </div>
+    );
+    return (
+      <div className="w-8 h-8 rounded-full bg-muted/40 border border-border flex items-center justify-center shrink-0">
+        <div className="w-2 h-2 rounded-full bg-muted-foreground/30"/>
+      </div>
+    );
+  };
 
- const Badge = ({ label, color }: { label: string; color: string }) => (
- <span className={`hidden sm:inline-block shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${color}`}>
- {label}
- </span>
- );
+  const Badge = ({ label, color }: { label: string; color: string }) => (
+    <span className={`inline-flex items-center shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border shadow-sm ${color}`}>
+      {label}
+    </span>
+  );
 
- return (
- <div className= "mb-5 rounded-2xl border border-border bg-card shadow-md overflow-hidden duration-300">
+  return (
+    <div className="mb-5 rounded-2xl border border-border/85 bg-card/65 backdrop-blur-md shadow-lg shadow-black/[0.02] overflow-hidden duration-300 hover:shadow-xl transition-shadow">
 
- {/* Step 1 — Provider Detection */}
- <div className= "flex items-center gap-3 px-4 py-3.5 border-b border-border">
- <Dot s={s1} />
- <div className= "flex-1 min-w-0">
- <p className= "text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Provider</p>
- {s1 === "success"&& (
- <div className= "flex items-center gap-2 min-w-0">
- <img src={`/provider-logos/${detectedSlug}.svg`} alt= ""className= "h-4 w-auto shrink-0 object-contain"
- onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
- <span className= "text-sm font-bold text-foreground truncate">{providerLabel}</span>
- </div>
- )}
- {s1 === "warning"&& (
- <div>
- <p className= "text-xs font-semibold text-amber-600 dark:text-amber-400">Provider not recognised</p>
- <p className= "text-[10px] text-muted-foreground mt-0.5">Supported: shutterstock.com · freepik.com · stock.adobe.com · elements.envato.com · istockphoto.com · magnific.com · alamy.com · flaticon.com + more</p>
- </div>
- )}
- {s1 === "idle"&& <p className= "text-xs text-muted-foreground/50">Detecting...</p>}
- </div>
- {s1 === "success"&& <Badge label= "Detected"color= "text-green-600 dark:text-green-400 bg-green-500/10"/>}
- {s1 === "warning"&& <Badge label= "Unknown"color= "text-amber-600 dark:text-amber-400 bg-amber-500/10"/>}
- </div>
+      {/* Step 1 — Provider Detection */}
+      <div className={`flex items-center justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s1 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+        <div className="flex items-center gap-3.5 min-w-0">
+          <Dot s={s1} />
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Provider</p>
+            {s1 === "success" && (
+              <div className="flex items-center gap-2 min-w-0">
+                <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto shrink-0 object-contain"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                <span className="text-sm font-extrabold text-foreground truncate">{providerLabel}</span>
+              </div>
+            )}
+            {s1 === "warning" && (
+              <div>
+                <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Provider not recognised</p>
+                <p className="text-[10px] text-muted-foreground/80 mt-0.5 leading-relaxed">Supported: Shutterstock, Freepik, Adobe Stock, Envato, Alamy, iStock, Flaticon & more</p>
+              </div>
+            )}
+            {s1 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting for URL or code...</p>}
+          </div>
+        </div>
+        {s1 === "success" && <Badge label="Detected" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+        {s1 === "warning" && <Badge label="Unknown" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+      </div>
 
- {/* Step 2 — Asset Verification */}
- <div className= "flex items-start gap-3 px-4 py-3.5 border-b border-border">
- <Dot s={s2} />
- <div className= "flex-1 min-w-0">
- <p className= "text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">File Check</p>
- {s2 === "idle"&& <p className= "text-xs text-muted-foreground/50">Waiting...</p>}
- {s2 === "loading"&& <p className= "text-sm font-semibold text-primary animate-pulse">Checking file... <span className= "text-xs font-normal text-muted-foreground">(nothing charged yet)</span></p>}
- {s2 === "success"&& assetCost != null && (
- <p className= "text-sm font-bold text-foreground">
- Available · <span className= "text-primary">{assetCost} cr</span>
- </p>
- )}
- {s2 === "editorial"&& (
- <div>
- <p className= "text-sm font-bold text-amber-600 dark:text-amber-400">Editorial — Cannot Download</p>
- <p className= "text-xs text-muted-foreground mt-0.5">Licensed for news use only, not commercial download.</p>
- </div>
- )}
- {s2 === "warning"&& assetError?.type === "no-package"&& (
- <p className= "text-sm font-bold text-amber-600 dark:text-amber-400">Temporarily Busy — Try Again Later</p>
- )}
- {s2 === "error"&& assetError && (
- <p className= "text-sm font-bold text-red-600 dark:text-red-400">
- {assetError.type === "not-found"?"File Not Found": "Could Not Check File"}
- </p>
- )}
- </div>
- {s2 === "success"&& assetCost != null && <Badge label={`${assetCost} cr`} color= "text-green-600 dark:text-green-400 bg-green-500/10"/>}
- {s2 === "editorial"&& <Badge label= "Editorial"color= "text-amber-600 dark:text-amber-400 bg-amber-500/10"/>}
- {(s2 === "warning"&& assetError?.type === "no-package") && <Badge label= "Unavailable"color= "text-amber-600 dark:text-amber-400 bg-amber-500/10"/>}
- {s2 === "error"&& <Badge label={assetError?.type === "not-found"?"Not Found": "Check Failed"} color= "text-red-600 dark:text-red-400 bg-red-500/10"/>}
- </div>
+      {/* Step 2 — Asset Verification */}
+      <div className={`flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s2 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+        <div className="flex items-start gap-3.5 min-w-0">
+          <Dot s={s2} />
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">File Check</p>
+            {s2 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting for provider check...</p>}
+            {s2 === "loading" && <p className="text-sm font-bold text-primary animate-pulse">Checking file... <span className="text-xs font-normal text-muted-foreground">(0 credits charged)</span></p>}
+            {s2 === "success" && assetCost != null && (
+              <p className="text-sm font-extrabold text-foreground">
+                Available · <span className="text-primary font-black">{assetCost} {assetCost === 1 ? "credit" : "credits"}</span>
+              </p>
+            )}
+            {s2 === "editorial" && (
+              <div>
+                <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">Editorial — Restricted</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">Licensed for news use only. Cannot be downloaded.</p>
+              </div>
+            )}
+            {s2 === "warning" && assetError?.type === "no-package" && (
+              <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Temporarily Busy — Try Again Later</p>
+            )}
+            {s2 === "error" && assetError && (
+              <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                {assetError.type === "not-found" ? "File Not Found" : "Could Not Check File"}
+              </p>
+            )}
+          </div>
+        </div>
+        {s2 === "success" && assetCost != null && <Badge label={`${assetCost} cr`} color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+        {s2 === "editorial" && <Badge label="Editorial" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+        {(s2 === "warning" && assetError?.type === "no-package") && <Badge label="Unavailable" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+        {s2 === "error" && <Badge label={assetError?.type === "not-found" ? "Not Found" : "Check Failed"} color="text-red-700 dark:text-red-400 bg-red-500/5 border-red-500/20"/>}
+      </div>
 
- {/* Step 3 — Credit Check */}
- <div className= "flex items-start gap-3 px-4 py-3.5">
- <Dot s={s3} />
- <div className= "flex-1 min-w-0">
- <p className= "text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Credits</p>
- {s3 === "idle"&& <p className= "text-xs text-muted-foreground/50">Waiting...</p>}
- {s3 === "success"&& assetCost != null && (
- <p className= "text-sm font-bold text-foreground">
- <span className= "text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> left after download
- </p>
- )}
- {s3 === "error"&& decodlShortfall && assetCost != null && (
- <div>
- <p className= "text-sm font-bold text-red-600 dark:text-red-400 mb-1">
- Service temporarily unavailable for this file
- </p>
- <p className= "text-xs text-muted-foreground mb-2">
- Our download service is temporarily low on capacity for this file. Please contact support and we will help you download it manually.
- </p>
- <a
- href= "https://wa.me/94772503124"
- target= "_blank"
- rel= "noopener noreferrer"
- className= "inline-flex items-center gap-2 text-xs font-bold bg-[#25D366] text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
- >
- <svg viewBox= "0 0 24 24"className= "w-3.5 h-3.5 fill-white shrink-0">
- <path d= "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
- </svg>
- Contact Support on WhatsApp
- </a>
- </div>
- )}
- {s3 === "warning"&& assetCost != null && (
- <div className= "flex flex-wrap items-center gap-2">
- <p className= "text-sm font-bold text-amber-600 dark:text-amber-400">
- Need {assetCost} cr · Have {creditBalance.toFixed(1)} cr
- </p>
- <Link
- to={routes.PricingPageRoute.to}
- className= "inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-2.5 py-1 rounded-lg hover:opacity-90 transition-opacity"
- >
- <svg className= "w-3 h-3"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M12 4v16m8-8H4"/>
- </svg>
- Buy Credits
- </Link>
- </div>
- )}
- </div>
- {s3 === "success"&& <Badge label= "OK"color= "text-green-600 dark:text-green-400 bg-green-500/10"/>}
- {s3 === "warning"&& <Badge label= "Top Up"color= "text-amber-600 dark:text-amber-400 bg-amber-500/10"/>}
- </div>
+      {/* Step 3 — Credit Check */}
+      <div className={`flex items-start justify-between gap-3 px-5 py-4 transition-colors duration-200 ${s3 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+        <div className="flex items-start gap-3.5 min-w-0">
+          <Dot s={s3} />
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Credits</p>
+            {s3 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting...</p>}
+            {s3 === "success" && assetCost != null && (
+              <p className="text-sm font-extrabold text-foreground">
+                <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> remaining after download
+              </p>
+            )}
+            {s3 === "error" && decodlShortfall && assetCost != null && (
+              <div>
+                <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
+                  Service temporarily low on capacity
+                </p>
+                <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+                  Please contact our support team via WhatsApp and we will download your file manually within a few minutes!
+                </p>
+                <a
+                  href="https://wa.me/94772503124"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-bold bg-[#25D366] text-white px-3.5 py-2 rounded-xl hover:opacity-90 active:scale-[0.98] transition-opacity shadow-sm shadow-[#25d366]/20"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white shrink-0">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                  Contact Support on WhatsApp
+                </a>
+              </div>
+            )}
+            {s3 === "warning" && assetCost != null && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                  Requires {assetCost} cr · You have {creditBalance.toFixed(1)} cr
+                </p>
+                <Link
+                  to={routes.PricingPageRoute.to}
+                  className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-md shadow-primary/10"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
+                  </svg>
+                  Buy Credits
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+        {s3 === "success" && <Badge label="OK" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+        {s3 === "warning" && <Badge label="Top Up" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+      </div>
 
- </div>
+    </div>
  );
  })()}
 
@@ -1108,13 +1121,13 @@ export default function DashboardPage() {
  <Button
  type= "submit"
  disabled={isSubmitting || liveInfoLoading || !detectedSlug || !url.trim() || decodlShortfall}
- className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all shadow-md disabled:cursor-not-allowed"
+ className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all duration-200 active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg shadow-md disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed cursor-pointer"
  >
  {isSubmitting ? (
  <>
- <svg className= "animate-spin w-4 h-4 mr-2"fill= "none"viewBox= "0 0 24 24">
- <circle className= "opacity-25"cx= "12"cy= "12"r= "10"stroke= "currentColor"strokeWidth= "4"></circle>
- <path className= "opacity-75"fill= "currentColor"d= "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+ <svg className= "animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+ <circle className= "opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+ <path className= "opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
  </svg>
  Submitting...
  </>
@@ -1264,7 +1277,7 @@ export default function DashboardPage() {
  }).filter(Boolean);
  return validBulkLines.length === 0;
  })()}
- className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all shadow-md disabled:cursor-not-allowed"
+ className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all duration-200 active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg shadow-md disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed cursor-pointer"
  >
  {bulkSubmitting ? (
  <>
@@ -1570,7 +1583,7 @@ export default function DashboardPage() {
  </div>
  <span
  key={statusInfo.text}
- className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-300 ${statusInfo.colorClass}`}
+ className={statusInfo.colorClass}
  >
  {statusInfo.isProcessing && (
  <svg className= "animate-spin -ml-0.5 mr-1 h-3 w-3"fill= "none"viewBox= "0 0 24 24">

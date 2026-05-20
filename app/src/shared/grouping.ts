@@ -90,18 +90,18 @@ export function getBatchStatusText(items: any[]): { text: string; colorClass: st
   const pending = items.filter(i => i.status === "pending").length;
 
   if (completed === total) {
-    return { text: "Completed", colorClass: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20", isProcessing: false };
+    return { text: "Completed", colorClass: "badge-premium badge-premium-completed", isProcessing: false };
   }
   if (failed === total) {
-    return { text: "Failed", colorClass: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20", isProcessing: false };
+    return { text: "Failed", colorClass: "badge-premium badge-premium-failed", isProcessing: false };
   }
   if (refunded === total) {
-    return { text: "Refunded", colorClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20", isProcessing: false };
+    return { text: "Refunded", colorClass: "badge-premium badge-premium-refunded", isProcessing: false };
   }
 
   const done = completed + failed + refunded;
   if (done === total) {
-    return { text: `Completed (${completed}/${total} ok)`, colorClass: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20", isProcessing: false };
+    return { text: `Completed (${completed}/${total} ok)`, colorClass: "badge-premium badge-premium-completed", isProcessing: false };
   }
-  return { text: `Processing (${completed}/${total} done)`, colorClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20", isProcessing: true };
+  return { text: `Processing (${completed}/${total} done)`, colorClass: "badge-premium badge-premium-processing", isProcessing: true };
 }

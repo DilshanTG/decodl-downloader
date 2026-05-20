@@ -197,7 +197,7 @@ export default function DetailPage() {
                   })}
                 </p>
               </div>
-              <span className={`self-start inline-flex items-center text-xs font-extrabold px-3 py-1.5 rounded-full ${DOWNLOAD_STATUS_COLORS[download.status] || "bg-muted text-foreground"}`}>
+              <span className={`self-start ${DOWNLOAD_STATUS_COLORS[download.status] || "bg-muted text-foreground"}`}>
                 {download.status === "processing" && (
                   <svg className="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -213,11 +213,11 @@ export default function DetailPage() {
               <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
                 Progress Status
               </span>
-              <div className="relative flex items-center justify-between">
+              <div className="relative flex items-center justify-between px-2">
                 {/* connector line */}
-                <div className="absolute left-0 right-0 top-4 h-0.5 bg-muted"></div>
+                <div className="absolute left-2 right-2 top-4 h-0.5 bg-muted"></div>
                 <div
-                  className="absolute left-0 top-4 h-0.5 bg-primary transition-all duration-500"
+                  className="absolute left-2 top-4 h-0.5 bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-[0_0_8px_rgba(107,0,246,0.35)]"
                   style={{
                     width: download.status === "pending" ? "0%"
                       : download.status === "processing" ? "50%"
@@ -230,13 +230,19 @@ export default function DetailPage() {
                 {TIMELINE_STEPS.map((step, idx) => {
                   const isActive = TIMELINE_STEPS[idx].statuses.includes(download.status);
                   const isFailed = download.status === "failed" && step.key === "processing";
+                  const isCurrent = (download.status === "pending" && step.key === "submitted")
+                    || (download.status === "processing" && step.key === "processing")
+                    || (download.status === "completed" && step.key === "ready");
+
                   return (
                     <div key={step.key} className="relative flex flex-col items-center z-10">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                         isFailed
-                          ? "bg-red-500/10 text-red-500 border-2 border-red-500/30"
+                          ? "bg-red-500/10 text-red-500 border-2 border-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                          : isCurrent
+                          ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(107,0,246,0.5)] border border-primary-foreground/20 scale-110 animate-pulse"
                           : isActive
-                          ? "bg-primary text-primary-foreground shadow-md"
+                          ? "bg-primary text-primary-foreground shadow-md border border-primary-foreground/20"
                           : "bg-background border-2 border-border text-muted-foreground"
                       }`}>
                         {isFailed ? (
@@ -265,7 +271,7 @@ export default function DetailPage() {
               <div className="mb-4">
                 <Button
                   asChild
-                  className="w-full py-7 rounded-xl font-extrabold text-base tracking-wide shadow-md transition-transform active:scale-[0.99]"
+                  className="w-full py-7 rounded-xl font-extrabold text-base tracking-wide shadow-md transition-all duration-200 active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg bg-green-500 hover:bg-green-600 text-white cursor-pointer"
                 >
                   <a href={getDownloadUrl(download.id, download.downloadToken)} target="_blank" rel="noopener noreferrer">
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,64 +407,79 @@ export default function DetailPage() {
               <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
                 Asset Metadata
               </span>
-              <dl className="space-y-3.5">
-                <div className="flex justify-between text-sm">
-                  <dt className="text-muted-foreground font-semibold">Provider</dt>
-                  <dd className="text-foreground font-extrabold">{getDisplayName(download.providerSlug)}</dd>
+              <div className="bg-muted/20 dark:bg-muted/5 border border-border/85 rounded-2xl p-4 space-y-3.5 shadow-inner">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-semibold">Provider</span>
+                  <span className="text-foreground font-extrabold">{getDisplayName(download.providerSlug)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <dt className="text-muted-foreground font-semibold">Credits Charged</dt>
-                  <dd className="text-foreground font-extrabold">{download.creditsCharged ?? "—"}</dd>
+                <div className="h-px bg-border/50" />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-semibold">Credits Charged</span>
+                  <span className="text-foreground font-extrabold">{download.creditsCharged ?? "—"}</span>
                 </div>
                 {(download.link || download.code) && (
-                  <div className="flex justify-between text-sm gap-4 items-start">
-                    <dt className="text-muted-foreground font-semibold shrink-0">{download.link ? "Submitted URL" : "Submitted Code"}</dt>
-                    <dd className="text-right max-w-[260px]">
-                      {download.link ? (
-                        <a
-                          href={download.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary text-xs font-semibold hover:underline break-all"
-                          title={download.link}
-                        >
-                          {download.link.length > 60 ? download.link.slice(0, 57) + "…" : download.link}
-                        </a>
-                      ) : (
-                        <span className="text-foreground font-mono text-xs font-bold">{download.code}</span>
-                      )}
-                    </dd>
-                  </div>
+                  <>
+                    <div className="h-px bg-border/50" />
+                    <div className="flex justify-between text-sm gap-4 items-start">
+                      <span className="text-muted-foreground font-semibold shrink-0">{download.link ? "Submitted URL" : "Submitted Code"}</span>
+                      <span className="text-right max-w-[260px]">
+                        {download.link ? (
+                          <a
+                            href={download.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary text-xs font-semibold hover:underline break-all"
+                            title={download.link}
+                          >
+                            {download.link.length > 60 ? download.link.slice(0, 57) + "…" : download.link}
+                          </a>
+                        ) : (
+                          <span className="text-foreground font-mono text-xs font-bold">{download.code}</span>
+                        )}
+                      </span>
+                    </div>
+                  </>
                 )}
                 {download.fileName && (
-                  <div className="flex justify-between text-sm gap-4">
-                    <dt className="text-muted-foreground font-semibold shrink-0">File Name</dt>
-                    <dd className="text-foreground font-extrabold text-right truncate max-w-[280px]" title={download.fileName}>
-                      {download.fileName}
-                    </dd>
-                  </div>
+                  <>
+                    <div className="h-px bg-border/50" />
+                    <div className="flex justify-between text-sm gap-4">
+                      <span className="text-muted-foreground font-semibold shrink-0">File Name</span>
+                      <span className="text-foreground font-extrabold text-right truncate max-w-[280px]" title={download.fileName}>
+                        {download.fileName}
+                      </span>
+                    </div>
+                  </>
                 )}
                 {download.fileSize && (
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-muted-foreground font-semibold">File Size</dt>
-                    <dd className="text-foreground font-extrabold">{formatBytes(download.fileSize)}</dd>
-                  </div>
+                  <>
+                    <div className="h-px bg-border/50" />
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground font-semibold">File Size</span>
+                      <span className="text-foreground font-extrabold">{formatBytes(download.fileSize)}</span>
+                    </div>
+                  </>
                 )}
                 {download.expiresAt && download.status === "completed" && !isExpired && (
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-muted-foreground font-semibold">Expires In</dt>
-                    <dd><ExpiryCountdown expiresAt={download.expiresAt} onExpire={refetch} /></dd>
-                  </div>
+                  <>
+                    <div className="h-px bg-border/50" />
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground font-semibold">Expires In</span>
+                      <span><ExpiryCountdown expiresAt={download.expiresAt} onExpire={refetch} /></span>
+                    </div>
+                  </>
                 )}
-                <div className="flex justify-between text-sm">
-                  <dt className="text-muted-foreground font-semibold">Retry Count</dt>
-                  <dd className="text-foreground font-extrabold">{download.retryCount} / 3</dd>
+                <div className="h-px bg-border/50" />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-semibold">Retry Count</span>
+                  <span className="text-foreground font-extrabold">{download.retryCount} / 3</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <dt className="text-muted-foreground font-semibold">Download ID</dt>
-                  <dd className="text-muted-foreground font-mono text-xs">{download.id}</dd>
+                <div className="h-px bg-border/50" />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-semibold">Download ID</span>
+                  <span className="text-muted-foreground font-mono text-xs select-all">{download.id}</span>
                 </div>
-              </dl>
+              </div>
             </div>
           </CardContent>
         </Card>
