@@ -1510,7 +1510,7 @@ export default function DashboardPage() {
  </Button>
  </div>
  <a
- href={`https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${download.id}?token=${download.downloadToken}`}
+ href={`https://dl.stockmart.lk/file/${download.id}?token=${download.downloadToken}`}
  target= "_blank"
  rel= "noopener noreferrer"
  className= "flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 active:scale-[0.98] text-white font-extrabold text-sm transition-all shadow-md shadow-green-500/20"

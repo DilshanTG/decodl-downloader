@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../cl
 const TERMINAL_STATUSES = new Set(["completed", "failed", "refunded"]);
 
 function getDownloadUrl(downloadId: string, downloadToken?: string) {
-  const base = `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+  const base = `https://dl.stockmart.lk/file/${downloadId}`;
   return downloadToken ? `${base}?token=${downloadToken}` : base;
 }
 

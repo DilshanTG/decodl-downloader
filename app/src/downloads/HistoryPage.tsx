@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 function getDownloadUrl(downloadId: string, downloadToken?: string) {
-  const base = `https://stockmart-dl.dilshantharakagunasekara.workers.dev/file/${downloadId}`;
+  const base = `https://dl.stockmart.lk/file/${downloadId}`;
   return downloadToken ? `${base}?token=${downloadToken}` : base;
 }
 
