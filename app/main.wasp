@@ -3,21 +3,57 @@ app stockmart {
     version: "^0.22.0"
   },
 
-  title: "StockMart.lk - Sri Lanka's Premium Stock Media Downloader",
+  title: "StockMart.lk — Sri Lanka's #1 Stock Media Downloader | Pay in LKR",
 
   head: [
+    // ── Favicon & Icons ──────────────────────────────────────────
     "<link rel='icon' type='image/png' href='/favicon.png' />",
-    "<meta name='description' content='Download premium stock photos, videos, and graphics from Shutterstock, Freepik, Adobe Stock, Envato Elements and more. Pay in LKR.' />",
+    "<link rel='apple-touch-icon' href='/favicon.png' />",
+    "<meta name='theme-color' content='#6B00F6' />",
+    "<meta name='msapplication-TileColor' content='#6B00F6' />",
+
+    // ── Core SEO ─────────────────────────────────────────────────
+    "<meta name='description' content='StockMart.lk — Download premium stock photos, videos, vectors and icons from Shutterstock, Freepik, Adobe Stock, Envato Elements and 20+ providers. Pay in LKR. No USD conversion needed.' />",
+    "<meta name='keywords' content='stock photos sri lanka, shutterstock download, freepik download, adobe stock, envato elements, stock media lkr, premium images download, stock videos sri lanka, stockmart' />",
     "<meta name='author' content='DigiMart Solutions (Pvt) Ltd' />",
-    "<meta name='keywords' content='stock photos, shutterstock, freepik, adobe stock, envato elements, download, sri lanka, lkr' />",
+    "<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />",
+    "<meta name='googlebot' content='index, follow' />",
+    "<link rel='canonical' href='https://www.stockmart.lk' />",
+
+    // ── Geo & Language ───────────────────────────────────────────
+    "<meta name='geo.region' content='LK' />",
+    "<meta name='geo.country' content='Sri Lanka' />",
+    "<meta name='language' content='English' />",
+    "<meta http-equiv='content-language' content='en-lk' />",
+
+    // ── Open Graph (Facebook, LinkedIn, WhatsApp, Slack) ─────────
     "<meta property='og:type' content='website' />",
-    "<meta property='og:title' content='StockMart.lk - Sri Lanka Stock Media Downloader' />",
     "<meta property='og:site_name' content='StockMart.lk' />",
-    "<meta property='og:url' content='https://stockmart.lk' />",
-    "<meta property='og:description' content='Download premium stock media and pay in LKR. Shutterstock, Freepik, Adobe Stock and more.' />",
-    "<meta property='og:image' content='https://stockmart.lk/public-banner.webp' />",
+    "<meta property='og:url' content='https://www.stockmart.lk' />",
+    "<meta property='og:title' content='StockMart.lk — Sri Lanka&apos;s #1 Stock Media Downloader' />",
+    "<meta property='og:description' content='Download from Shutterstock, Freepik, Adobe Stock, Envato Elements and 20+ providers. Pay in LKR — no USD conversion. Credits never expire.' />",
+    "<meta property='og:image' content='https://www.stockmart.lk/thumbnail.jpg' />",
+    "<meta property='og:image:secure_url' content='https://www.stockmart.lk/thumbnail.jpg' />",
+    "<meta property='og:image:type' content='image/jpeg' />",
+    "<meta property='og:image:width' content='2000' />",
+    "<meta property='og:image:height' content='2000' />",
+    "<meta property='og:image:alt' content='StockMart.lk — Download premium stock media and pay in LKR' />",
+    "<meta property='og:locale' content='en_US' />",
+
+    // ── Twitter / X Card ─────────────────────────────────────────
     "<meta name='twitter:card' content='summary_large_image' />",
-    "<meta name='twitter:image' content='https://stockmart.lk/public-banner.webp' />",
+    "<meta name='twitter:site' content='@stockmartlk' />",
+    "<meta name='twitter:creator' content='@stockmartlk' />",
+    "<meta name='twitter:title' content='StockMart.lk — Sri Lanka&apos;s #1 Stock Media Downloader' />",
+    "<meta name='twitter:description' content='Download from 20+ premium providers — Shutterstock, Freepik, Adobe Stock. Pay in LKR. Credits never expire.' />",
+    "<meta name='twitter:image' content='https://www.stockmart.lk/thumbnail.jpg' />",
+    "<meta name='twitter:image:alt' content='StockMart.lk — Download premium stock media and pay in LKR' />",
+
+    // ── Schema.org JSON-LD Structured Data ───────────────────────
+    "<script type='application/ld+json'>{\"@context\":\"https://schema.org\",\"@type\":\"WebSite\",\"name\":\"StockMart.lk\",\"url\":\"https://www.stockmart.lk\",\"description\":\"Sri Lanka's #1 stock media downloader. Download from Shutterstock, Freepik, Adobe Stock and 20+ providers. Pay in LKR.\",\"publisher\":{\"@type\":\"Organization\",\"name\":\"DigiMart Solutions (Pvt) Ltd\",\"url\":\"https://digimartsolutions.lk\",\"logo\":{\"@type\":\"ImageObject\",\"url\":\"https://www.stockmart.lk/stockmart-logo.svg\"}},\"potentialAction\":{\"@type\":\"SearchAction\",\"target\":\"https://www.stockmart.lk/dashboard\",\"query-input\":\"required name=search_term_string\"}}</script>",
+    "<script type='application/ld+json'>{\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"StockMart.lk\",\"applicationCategory\":\"MultimediaApplication\",\"operatingSystem\":\"Web\",\"url\":\"https://www.stockmart.lk\",\"description\":\"Download premium stock photos, videos and vectors from 20+ providers. Pay in LKR.\",\"offers\":{\"@type\":\"AggregateOffer\",\"priceCurrency\":\"LKR\",\"lowPrice\":\"200\",\"highPrice\":\"140000\"},\"publisher\":{\"@type\":\"Organization\",\"name\":\"DigiMart Solutions (Pvt) Ltd\"}}</script>",
+
+    // ── Fonts ────────────────────────────────────────────────────
     "<link rel='preconnect' href='https://fonts.googleapis.com' />",
     "<link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />",
     "<link href='https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap' rel='stylesheet' />",
