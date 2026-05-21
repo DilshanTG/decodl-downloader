@@ -24,7 +24,7 @@ cd -
 
 echo ""
 echo "⚡  Building frontend..."
-REACT_APP_API_URL=https://stockmart-production.up.railway.app npx vite build
+REACT_APP_API_URL=https://api.stockmart.lk npx vite build
 printf '{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}' > .wasp/out/web-app/build/vercel.json
 
 echo ""
@@ -36,5 +36,5 @@ cd -
 
 echo ""
 echo "✅  Done! Both Railway and Vercel are deploying."
-echo "    Frontend: https://stockmart-five.vercel.app"
-echo "    Backend:  https://stockmart-production.up.railway.app"
+echo "    Frontend: https://www.stockmart.lk"
+echo "    Backend:  https://api.stockmart.lk"

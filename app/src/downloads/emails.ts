@@ -1,6 +1,6 @@
 import { emailSender } from 'wasp/server/email'
 
-const CLIENT_URL = process.env.WASP_WEB_CLIENT_URL ?? 'https://stockmart-five.vercel.app'
+const CLIENT_URL = process.env.WASP_WEB_CLIENT_URL ?? 'https://www.stockmart.lk'
 
 export async function sendDownloadReadyEmail({
   toEmail,

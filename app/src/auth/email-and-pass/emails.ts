@@ -3,7 +3,7 @@ import {
   type GetVerificationEmailContentFn,
 } from "wasp/server/auth";
 
-const CLIENT_URL = process.env.WASP_WEB_CLIENT_URL ?? 'https://stockmart-five.vercel.app'
+const CLIENT_URL = process.env.WASP_WEB_CLIENT_URL ?? 'https://www.stockmart.lk'
 
 const baseStyle = `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f0f`
 const cardStyle = `max-width:520px;margin:40px auto;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;overflow:hidden`

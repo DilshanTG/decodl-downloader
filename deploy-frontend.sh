@@ -15,4 +15,4 @@ vercel link --yes --project stockmart 2>/dev/null
 vercel --prod --yes
 
 echo ""
-echo "✅ Frontend live: https://stockmart-five.vercel.app"
+echo "✅ Frontend live: https://www.stockmart.lk"
