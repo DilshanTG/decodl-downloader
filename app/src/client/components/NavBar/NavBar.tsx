@@ -296,10 +296,10 @@ function renderNavigationItems(
   });
 }
 
-const NavLogo = ({ isScrolled: _ }: { isScrolled: boolean }) => (
+const NavLogo = ({ isScrolled }: { isScrolled: boolean }) => (
   <img
     src="/stockmart-logo.svg"
     alt="StockMart.lk"
-    className="h-10 object-contain"
+    className={`object-contain transition-all duration-200 ${isScrolled ? "h-10" : "h-12"}`}
   />
 );
