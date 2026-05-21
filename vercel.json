@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm install -g @wasp.sh/wasp-cli@0.22.0 && cd app && wasp build",
-  "outputDirectory": "app/.wasp/out/web-app/dist",
+  "buildCommand": "npm install -g @wasp.sh/wasp-cli@0.22.0 && cd app && REACT_APP_API_URL=https://api.stockmart.lk wasp build",
+  "outputDirectory": "app/.wasp/out/web-app/build",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

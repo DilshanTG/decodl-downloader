@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")/app"
 
 echo "⚡  Building frontend..."
-REACT_APP_API_URL=https://stockmart-production.up.railway.app npx vite build
+REACT_APP_API_URL=https://api.stockmart.lk npx vite build
 
 printf '{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}' \
   > .wasp/out/web-app/build/vercel.json
