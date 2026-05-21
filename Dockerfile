@@ -1,9 +1,8 @@
 # Stage 1: Run wasp build to generate server code
 # Uses Debian (not Alpine) because the Wasp CLI binary requires glibc
 FROM node:22.22.2-bookworm-slim AS wasp-builder
-RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
-RUN curl -sSL https://get.wasp-lang.dev/installer.sh | sh -s -- -v 0.22.0
-ENV PATH="/root/.local/bin:$PATH"
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+RUN npm install -g @wasp.sh/wasp-cli@0.22.0
 WORKDIR /wasp-project
 COPY app/ ./
 # REACT_APP_API_URL is needed for the frontend build inside wasp build
