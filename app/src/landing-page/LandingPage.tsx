@@ -17,8 +17,9 @@ export default function LandingPage() {
     }
   }, [user]);
 
-  // Prevent flash of landing page content while loading or if user is authenticated
-  if (isLoading || user) {
+  // Only block render while redirecting authenticated users — never block for isLoading
+  // (isLoading causes a blank screen during Railway cold start, ~5-10s)
+  if (user) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-2"></div>
