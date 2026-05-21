@@ -240,8 +240,9 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                             className="h-8 rounded-lg text-xs font-bold px-3 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
                             onClick={async () => {
                               try {
-                                await adminSendPasswordReset({ userId: u.id });
-                                alert(`Password reset email sent to ${u.email}`);
+                                const { resetLink, email } = await adminSendPasswordReset({ userId: u.id }) as any;
+                                const copied = await navigator.clipboard.writeText(resetLink).then(() => true).catch(() => false);
+                                alert(`Reset link for ${email}:\n\n${resetLink}\n\n${copied ? "✅ Copied to clipboard!" : "Copy the link above and send to the user."}\n\nLink expires in 30 minutes.`);
                               } catch (e: any) {
                                 alert(`Failed: ${e.message}`);
                               }

@@ -13,8 +13,7 @@ import type {
 } from 'wasp/server/operations'
 import { processDecodlSubmission } from 'wasp/server/jobs'
 import { invalidatePricingCache } from '../credits/operations'
-import { sendPasswordResetEmail } from 'wasp/server/auth'
-import { getPasswordResetEmailContent } from '../auth/email-and-pass/emails'
+import { createPasswordResetLink } from 'wasp/server/auth'
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 function requireAdmin(context: any) {
@@ -415,26 +414,25 @@ type AdminSendPasswordResetInput = { userId: string }
 
 export const adminSendPasswordReset: AdminSendPasswordReset<
   AdminSendPasswordResetInput,
-  { success: boolean }
+  { resetLink: string; email: string }
 > = async ({ userId }, context) => {
   requireAdmin(context)
   if (!userId) throw new HttpError(400, 'userId required')
 
-  // Get email — check User.email first, then AuthIdentity providerUserId
+  // Get email from User or AuthIdentity
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
   let email = user?.email ?? null
 
   if (!email) {
-    // Fallback: find email from AuthIdentity (providerUserId IS the email for email provider)
     const auth = await prisma.auth.findUnique({ where: { userId }, include: { identities: true } })
     const identity = auth?.identities.find(i => i.providerName === 'email')
     email = identity?.providerUserId ?? null
   }
 
-  if (!email) throw new HttpError(404, 'No email found for this user')
+  if (!email) throw new HttpError(404, 'No email auth found for this user')
 
-  const content = getPasswordResetEmailContent({ passwordResetLink: `https://www.stockmart.lk/request-password-reset` })
-  await sendPasswordResetEmail(email, { ...content, to: email })
+  // Generate a reset link directly — valid for 30 minutes
+  const resetLink = await createPasswordResetLink(email, '/password-reset')
 
-  return { success: true }
+  return { resetLink, email }
 }
