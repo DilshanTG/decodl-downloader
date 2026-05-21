@@ -438,41 +438,8 @@ export default function PricingPage() {
                 </AccordionTrigger>
                 <AccordionContent className="px-6 pb-6 pt-4 border-t border-border/80">
 
-                  {/* Provider logo grid */}
-                  <h4 className="text-base font-extrabold font-heading text-foreground tracking-tight mb-1">Supported Providers</h4>
                   <p className="text-xs text-muted-foreground mb-6">
-                    Use your single credit balance across any supported site. Credit costs are determined by file quality and licensing costs.
-                  </p>
-                  {(["image", "icon", "video"] as const).map((cat) => {
-                    const providers = providerGroups[cat];
-                    if (!providers?.length) return null;
-                    return (
-                      <div key={cat} className="mb-8">
-                        <div className="flex items-center gap-3 mb-4">
-                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            {CATEGORY_LABELS[cat]}
-                          </span>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                          {providers.map((p) => (
-                            <ProviderLogoCard
-                              key={p.slug}
-                              slug={p.slug}
-                              name={p.name}
-                              minCost={p.minCost}
-                              maxCost={p.maxCost}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Full cost breakdown table */}
-                  <h4 className="text-base font-extrabold font-heading text-foreground tracking-tight mt-10 mb-1">Full Credit Cost Breakdown</h4>
-                  <p className="text-xs text-muted-foreground mb-6">
-                    Exact deduction per download, categorized by provider and file type.
+                    Credit cost per download, by provider and file type.
                   </p>
                   {(["image", "icon", "video"] as const).map((cat) => {
                     const rows = (pricingData as ProviderPricing[] | undefined)
@@ -570,17 +537,6 @@ export default function PricingPage() {
             </Accordion>
           </div>
 
-          {/* Contact note */}
-          <p className="text-center text-sm text-muted-foreground mt-10">
-            Questions? Email us at{" "}
-            <a href="mailto:support@stockmart.lk" className="text-primary hover:underline font-semibold">
-              support@stockmart.lk
-            </a>{" "}
-            or WhatsApp{" "}
-            <a href="https://wa.me/94772503124" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-semibold">
-              +94 77 250 3124
-            </a>
-          </p>
 
         </div>
       </div>

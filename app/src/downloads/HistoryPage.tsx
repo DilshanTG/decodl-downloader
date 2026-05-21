@@ -229,7 +229,7 @@ export default function HistoryPage() {
                       >
                         {/* Provider logo + info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 p-1.5 ${
+                          <div className={`w-24 h-8 rounded-lg flex items-center justify-center shrink-0 px-2 py-1 ${
                             isCompleted ? "bg-white" : isFailed ? "bg-red-50 dark:bg-red-950/30" : "bg-white"
                           }`}>
                             <img

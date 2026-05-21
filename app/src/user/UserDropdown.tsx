@@ -48,7 +48,7 @@ export function UserDropdown({ user }: { user: Partial<UserEntity> }) {
         <DropdownMenuItem>
           <button
             type="button"
-            onClick={() => logout()}
+            onClick={() => logout().then(() => window.location.href = '/login')}
             className="flex w-full items-center gap-3"
           >
             <LogOut size="1.1rem" />

@@ -621,11 +621,7 @@ export default function DashboardPage() {
  {typeof creditBalance === "number"? creditBalance.toFixed(1) : "—"}
  </div>
  )}
- {typeof creditBalance === "number"&& creditBalance > 0 && (
- <p className= "text-xs text-muted-foreground mt-1">≈ Rs. {Math.round(creditBalance * 180).toLocaleString()} value</p>
- )}
  <p className= "text-xs text-muted-foreground mb-1">credits available · <span className= "text-green-500 font-semibold">Never expire</span></p>
- <p className= "text-[10px] text-muted-foreground/60 mb-1">1 credit ≈ Rs. 180 · Used to download images, videos &amp; icons</p>
  {reservedAmount > 0 && (
  <p className= "text-xs text-amber-500 font-semibold mb-2">
  ⏳ {reservedAmount.toFixed(1)} credits temporarily held while your downloads process — automatically returned if anything fails
@@ -713,7 +709,7 @@ export default function DashboardPage() {
  </CardHeader>
  <CardContent className= "p-0">
  {/* Tabs Selector */}
- <div className="relative mb-6 bg-muted/65 p-1 rounded-xl flex w-full sm:w-fit border border-border/50">
+ <div className="relative mb-6 bg-muted/65 p-1 rounded-xl flex w-full sm:w-[340px] border border-border/50">
  <div
  className="absolute top-1 bottom-1 left-1 rounded-lg bg-card shadow-sm border border-border/20 transition-all duration-300 ease-out"
  style={{
@@ -724,7 +720,7 @@ export default function DashboardPage() {
  <button
  type="button"
  onClick={() => setActiveTab("single")}
- className={`relative z-10 flex-1 sm:flex-initial text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
+ className={`relative z-10 flex-1 text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
  activeTab === "single"
  ? "text-foreground font-extrabold"
  : "text-muted-foreground hover:text-foreground"
@@ -735,7 +731,7 @@ export default function DashboardPage() {
  <button
  type="button"
  onClick={() => setActiveTab("bulk")}
- className={`relative z-10 flex-1 sm:flex-initial text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
+ className={`relative z-10 flex-1 text-center py-2 px-6 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors active:scale-[0.98] ${
  activeTab === "bulk"
  ? "text-foreground font-extrabold"
  : "text-muted-foreground hover:text-foreground"

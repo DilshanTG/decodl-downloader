@@ -319,15 +319,7 @@ export default function CreditsPage() {
           </CardContent>
         </Card>
 
-        {/* Quick links */}
-        <div className="mt-6 flex flex-wrap gap-3 justify-center text-xs text-muted-foreground">
-          <Link to={routes.DashboardRoute.to} className="hover:text-foreground transition-colors">← Dashboard</Link>
-          <span>·</span>
-          <Link to={routes.DownloadHistoryRoute.to} className="hover:text-foreground transition-colors">Download History</Link>
-          <span>·</span>
-          <Link to={routes.PricingPageRoute.to} className="hover:text-foreground transition-colors">Buy Credits</Link>
-        </div>
-
+        
       </div>
     </div>
   );

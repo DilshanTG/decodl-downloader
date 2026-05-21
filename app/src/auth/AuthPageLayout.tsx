@@ -23,9 +23,9 @@ export function AuthPageLayout({
         </div>
 
         {/* Logo */}
-        <div className="relative z-10">
+        <div className="relative z-10 flex justify-center">
           <WaspRouterLink to={routes.LandingPageRoute.to}>
-            <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-10 object-contain" />
+            <img src="/stockmart-logo.svg" alt="StockMart.lk" className="h-16 object-contain" />
           </WaspRouterLink>
         </div>
 
