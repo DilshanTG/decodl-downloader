@@ -8,9 +8,13 @@ import type {
   AdminAdjustUserCredits,
   AdminUpdateProviderPricing,
   AdminForceRetryDownload,
+  AdminGetFailedDownloads,
+  AdminSendPasswordReset,
 } from 'wasp/server/operations'
 import { processDecodlSubmission } from 'wasp/server/jobs'
 import { invalidatePricingCache } from '../credits/operations'
+import { sendPasswordResetEmail } from 'wasp/server/auth'
+import { getPasswordResetEmailContent } from '../auth/email-and-pass/emails'
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 function requireAdmin(context: any) {
@@ -368,6 +372,65 @@ export const adminForceRetryDownload: AdminForceRetryDownload<
 
   // Actually requeue the job — without this the download stays pending forever
   await processDecodlSubmission.submit({ downloadId })
+
+  return { success: true }
+}
+
+// ─── Get Failed Downloads (for Decodl refund requests) ───────────────────────
+type AdminGetFailedDownloadsInput = { page?: number; providerSlug?: string }
+
+export const adminGetFailedDownloads: AdminGetFailedDownloads<
+  AdminGetFailedDownloadsInput,
+  any
+> = async ({ page = 1, providerSlug } = {}, context) => {
+  requireAdmin(context)
+  const PAGE_SIZE = 50
+  const where: any = { status: 'failed' }
+  if (providerSlug) where.providerSlug = providerSlug
+
+  const [downloads, total] = await Promise.all([
+    prisma.download.findMany({
+      where,
+      include: { user: { select: { id: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.download.count({ where }),
+  ])
+
+  // Group by provider for summary
+  const byProvider = await prisma.download.groupBy({
+    by: ['providerSlug'],
+    where: { status: 'failed' },
+    _count: { id: true },
+    _sum: { creditsCharged: true },
+  })
+
+  return { downloads, total, pages: Math.ceil(total / PAGE_SIZE), byProvider }
+}
+
+// ─── Send Password Reset Email (Admin) ───────────────────────────────────────
+type AdminSendPasswordResetInput = { userId: string }
+
+export const adminSendPasswordReset: AdminSendPasswordReset<
+  AdminSendPasswordResetInput,
+  { success: boolean }
+> = async ({ userId }, context) => {
+  requireAdmin(context)
+  if (!userId) throw new HttpError(400, 'userId required')
+
+  const authIdentity = await prisma.authIdentity.findFirst({
+    where: { authId: { in: (await prisma.auth.findMany({ where: { userId } })).map(a => a.id) }, providerName: 'email' },
+  })
+  if (!authIdentity) throw new HttpError(404, 'No email auth found for this user')
+
+  const providerData = JSON.parse(authIdentity.providerData ?? '{}')
+  const email = providerData.email
+  if (!email) throw new HttpError(404, 'No email found for this user')
+
+  const content = getPasswordResetEmailContent({ passwordResetLink: `https://www.stockmart.lk/request-password-reset` })
+  await sendPasswordResetEmail(email, { ...content, to: email })
 
   return { success: true }
 }

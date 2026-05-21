@@ -56,7 +56,7 @@ export default function SettingsPage({ user }: { user: AuthUser }) {
           <InfoRow label="Failed Downloads" value={(stats?.failedDownloads ?? 0).toLocaleString()} />
           <InfoRow label="Pending Queue" value={(stats?.pendingDownloads ?? 0).toLocaleString()} />
           <InfoRow label="Processing Now" value={(stats?.processingDownloads ?? 0).toLocaleString()} />
-          <InfoRow label="Total Revenue (LKR)" value={`Rs. ${((stats?.totalRevenueLKR ?? 0) / 100).toLocaleString()}`} />
+          <InfoRow label="Total Revenue (LKR)" value={`Rs. ${((stats?.totalRevenueLKR ?? 0)).toLocaleString()}`} />
           <InfoRow label="Total Credits Issued" value={(stats?.totalCreditsIssued ?? 0).toFixed(1)} />
         </SectionCard>
 

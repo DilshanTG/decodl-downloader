@@ -34,14 +34,25 @@ function WhatsAppButton() {
  * use this component to wrap all child components
  * this is useful for templates, themes, and context
  */
+const SCHEMA_WEBSITE = JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: "StockMart.lk", url: "https://www.stockmart.lk", description: "Sri Lanka's #1 stock media downloader. Pay in LKR.", publisher: { "@type": "Organization", name: "DigiMart Solutions (Pvt) Ltd", url: "https://digimartsolutions.lk" }, potentialAction: { "@type": "SearchAction", target: "https://www.stockmart.lk/dashboard", "query-input": "required name=search_term_string" } });
+const SCHEMA_APP = JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "StockMart.lk", applicationCategory: "MultimediaApplication", operatingSystem: "Web", url: "https://www.stockmart.lk", offers: { "@type": "AggregateOffer", priceCurrency: "LKR", lowPrice: "200", highPrice: "140000" }, publisher: { "@type": "Organization", name: "DigiMart Solutions (Pvt) Ltd" } });
+
 export default function App() {
   const location = useLocation();
   const { data: user } = useAuth();
 
   const isLandingPage = location.pathname === "/";
 
+  // Smooth scroll to anchor when hash changes (for /#section links)
+  useEffect(() => {
+    const hash = location.hash;
+    if (!hash) return;
+    const el = document.querySelector(hash);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash]);
+
   // Logged-in users always get app nav. Guests get marketing nav on public pages.
-  const isPublicPage = isLandingPage || location.pathname === "/pricing";
+  const isPublicPage = isLandingPage || location.pathname === "/pricing" || location.pathname === "/contact";
   const navigationItems = useMemo(() => {
     if (user) return appNavigationItems;
     return isPublicPage ? marketingNavigationItems : appNavigationItems;
@@ -80,6 +91,8 @@ export default function App() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SCHEMA_WEBSITE }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SCHEMA_APP }} />
       <div className="bg-background text-foreground min-h-screen pb-16 sm:pb-0">
         {isAdminDashboard ? (
           <Outlet />

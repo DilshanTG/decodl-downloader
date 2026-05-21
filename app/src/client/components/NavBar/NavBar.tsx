@@ -219,6 +219,7 @@ function renderNavigationItems(
   return navigationItems.map((item) => {
     const Icon = item.icon;
     const isExternal = item.to.startsWith("http");
+    const isAnchor = item.to.includes("#");
 
     if (isExternal) {
       return (
@@ -245,6 +246,26 @@ function renderNavigationItems(
                 )}
               />
             )}
+            <span>{item.name}</span>
+          </a>
+        </li>
+      );
+    }
+
+    if (isAnchor) {
+      return (
+        <li key={item.name}>
+          <a
+            href={item.to}
+            className={cn(
+              "group flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200",
+              setMobileMenuOpen
+                ? "w-full px-3 py-2.5 text-foreground hover:bg-accent"
+                : "px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/40"
+            )}
+            onClick={setMobileMenuOpen && (() => setMobileMenuOpen(false))}
+          >
+            {Icon && <Icon className="w-4.5 h-4.5 shrink-0 text-muted-foreground/75 group-hover:text-primary transition-transform group-hover:scale-110" />}
             <span>{item.name}</span>
           </a>
         </li>

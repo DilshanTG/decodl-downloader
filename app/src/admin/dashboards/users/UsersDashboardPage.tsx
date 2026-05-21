@@ -4,6 +4,7 @@ import {
   getPaginatedUsers,
   updateIsUserAdminById,
   adminAdjustUserCredits,
+  adminSendPasswordReset,
   useQuery,
 } from "wasp/client/operations";
 import { type User } from "wasp/entities";
@@ -224,7 +225,7 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                         <AdminSwitch {...u} />
                       </td>
                       <td className="py-4 px-5">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <Button
                             size="sm"
                             variant="outline"
@@ -232,6 +233,21 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                             onClick={() => setCreditModalUser(u)}
                           >
                             Adjust Credits
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-lg text-xs font-bold px-3 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                            onClick={async () => {
+                              try {
+                                await adminSendPasswordReset({ userId: u.id });
+                                alert(`Password reset email sent to ${u.email}`);
+                              } catch (e: any) {
+                                alert(`Failed: ${e.message}`);
+                              }
+                            }}
+                          >
+                            Reset Password
                           </Button>
                           <Button
                             size="sm"

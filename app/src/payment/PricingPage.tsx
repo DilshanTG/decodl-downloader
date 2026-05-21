@@ -94,6 +94,8 @@ export default function PricingPage() {
   const [confirmPackage, setConfirmPackage] = useState<string | null>(null);
   const { data: pricingData } = useQuery(getProviderPricing);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const payment = params.get("payment");

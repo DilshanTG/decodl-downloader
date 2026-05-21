@@ -49,7 +49,7 @@ export default function AdminPaymentsPage({ user }: { user: AuthUser }) {
           <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Revenue</p>
             <p className="text-2xl font-black text-emerald-500 tabular-nums">
-              Rs. {isLoading ? "—" : ((data?.totalRevenueLKR ?? 0) / 100).toLocaleString()}
+              Rs. {isLoading ? "—" : ((data?.totalRevenueLKR ?? 0)).toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">All paid transactions</p>
           </div>
@@ -125,7 +125,7 @@ export default function AdminPaymentsPage({ user }: { user: AuthUser }) {
                         <span className="text-sm font-bold text-foreground">{p.packageId}</span>
                       </td>
                       <td className="py-4 px-5">
-                        <span className="text-sm font-extrabold text-emerald-500 tabular-nums">Rs. {(p.amountLKR / 100).toLocaleString()}</span>
+                        <span className="text-sm font-extrabold text-emerald-500 tabular-nums">Rs. {(p.amountLKR).toLocaleString()}</span>
                       </td>
                       <td className="py-4 px-5">
                         <span className="text-sm font-extrabold text-primary tabular-nums">{p.creditsAwarded.toFixed(1)}</span>

@@ -49,10 +49,6 @@ app stockmart {
     "<meta name='twitter:image' content='https://www.stockmart.lk/thumbnail.jpg' />",
     "<meta name='twitter:image:alt' content='StockMart.lk — Download premium stock media and pay in LKR' />",
 
-    // ── Schema.org JSON-LD Structured Data ───────────────────────
-    "<script type='application/ld+json'>{\"@context\":\"https://schema.org\",\"@type\":\"WebSite\",\"name\":\"StockMart.lk\",\"url\":\"https://www.stockmart.lk\",\"description\":\"Sri Lanka's #1 stock media downloader. Download from Shutterstock, Freepik, Adobe Stock and 20+ providers. Pay in LKR.\",\"publisher\":{\"@type\":\"Organization\",\"name\":\"DigiMart Solutions (Pvt) Ltd\",\"url\":\"https://digimartsolutions.lk\",\"logo\":{\"@type\":\"ImageObject\",\"url\":\"https://www.stockmart.lk/stockmart-logo.svg\"}},\"potentialAction\":{\"@type\":\"SearchAction\",\"target\":\"https://www.stockmart.lk/dashboard\",\"query-input\":\"required name=search_term_string\"}}</script>",
-    "<script type='application/ld+json'>{\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"StockMart.lk\",\"applicationCategory\":\"MultimediaApplication\",\"operatingSystem\":\"Web\",\"url\":\"https://www.stockmart.lk\",\"description\":\"Download premium stock photos, videos and vectors from 20+ providers. Pay in LKR.\",\"offers\":{\"@type\":\"AggregateOffer\",\"priceCurrency\":\"LKR\",\"lowPrice\":\"200\",\"highPrice\":\"140000\"},\"publisher\":{\"@type\":\"Organization\",\"name\":\"DigiMart Solutions (Pvt) Ltd\"}}</script>",
-
     // ── Fonts ────────────────────────────────────────────────────
     "<link rel='preconnect' href='https://fonts.googleapis.com' />",
     "<link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />",
@@ -114,6 +110,11 @@ page LandingPage {
 route PricingPageRoute { path: "/pricing", to: PricingPage }
 page PricingPage {
   component: import PricingPage from "@src/payment/PricingPage"
+}
+
+route ContactPageRoute { path: "/contact", to: ContactPage }
+page ContactPage {
+  component: import ContactPage from "@src/contact/ContactPage"
 }
 
 // ─── Auth Pages ───────────────────────────────────────────────────────────────
@@ -356,6 +357,16 @@ action adminForceRetryDownload {
   entities: [Download]
 }
 
+query adminGetFailedDownloads {
+  fn: import { adminGetFailedDownloads } from "@src/admin/operations",
+  entities: [Download, User]
+}
+
+action adminSendPasswordReset {
+  fn: import { adminSendPasswordReset } from "@src/admin/operations",
+  entities: [User]
+}
+
 route AdminRoute { path: "/admin", to: AnalyticsDashboardPage }
 page AnalyticsDashboardPage {
   authRequired: true,
@@ -396,6 +407,12 @@ route AdminSettingsRoute { path: "/admin/settings", to: AdminSettingsPage }
 page AdminSettingsPage {
   authRequired: true,
   component: import AdminSettings from "@src/admin/elements/settings/SettingsPage"
+}
+
+route AdminFailedDownloadsRoute { path: "/admin/failed-downloads", to: AdminFailedDownloadsPage }
+page AdminFailedDownloadsPage {
+  authRequired: true,
+  component: import AdminFailedDownloadsPage from "@src/admin/dashboards/downloads/AdminFailedDownloadsPage"
 }
 
 route RefundPolicyRoute { path: "/refund-policy", to: RefundPolicyPage }
