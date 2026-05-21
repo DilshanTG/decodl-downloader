@@ -6,7 +6,7 @@ app stockmart {
   title: "StockMart.lk - Sri Lanka's Premium Stock Media Downloader",
 
   head: [
-    "<link rel='icon' href='/favicon.ico' />",
+    "<link rel='icon' type='image/png' href='/favicon.png' />",
     "<meta name='description' content='Download premium stock photos, videos, and graphics from Shutterstock, Freepik, Adobe Stock, Envato Elements and more. Pay in LKR.' />",
     "<meta name='author' content='DigiMart Solutions (Pvt) Ltd' />",
     "<meta name='keywords' content='stock photos, shutterstock, freepik, adobe stock, envato elements, download, sri lanka, lkr' />",
