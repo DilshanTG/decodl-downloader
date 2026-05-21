@@ -420,13 +420,17 @@ export const adminSendPasswordReset: AdminSendPasswordReset<
   requireAdmin(context)
   if (!userId) throw new HttpError(400, 'userId required')
 
-  const authIdentity = await prisma.authIdentity.findFirst({
-    where: { authId: { in: (await prisma.auth.findMany({ where: { userId } })).map(a => a.id) }, providerName: 'email' },
-  })
-  if (!authIdentity) throw new HttpError(404, 'No email auth found for this user')
+  // Get email — check User.email first, then AuthIdentity providerUserId
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+  let email = user?.email ?? null
 
-  const providerData = JSON.parse(authIdentity.providerData ?? '{}')
-  const email = providerData.email
+  if (!email) {
+    // Fallback: find email from AuthIdentity (providerUserId IS the email for email provider)
+    const auth = await prisma.auth.findUnique({ where: { userId }, include: { identities: true } })
+    const identity = auth?.identities.find(i => i.providerName === 'email')
+    email = identity?.providerUserId ?? null
+  }
+
   if (!email) throw new HttpError(404, 'No email found for this user')
 
   const content = getPasswordResetEmailContent({ passwordResetLink: `https://www.stockmart.lk/request-password-reset` })
