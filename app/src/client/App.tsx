@@ -40,11 +40,12 @@ export default function App() {
 
   const isLandingPage = location.pathname === "/";
 
-  // Logged-in users always get app nav. Guests only get marketing nav on landing page.
+  // Logged-in users always get app nav. Guests get marketing nav on public pages.
+  const isPublicPage = isLandingPage || location.pathname === "/pricing";
   const navigationItems = useMemo(() => {
     if (user) return appNavigationItems;
-    return isLandingPage ? marketingNavigationItems : appNavigationItems;
-  }, [user, isLandingPage]);
+    return isPublicPage ? marketingNavigationItems : appNavigationItems;
+  }, [user, isPublicPage]);
 
   const shouldDisplayAppNavBar = useMemo(() => {
     return (
