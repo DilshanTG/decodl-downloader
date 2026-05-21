@@ -242,9 +242,16 @@ export default function PricingPage() {
               const totalWithFee = Math.round(pkg.priceLKR * 1.03);
 
               return (
+                <div key={pkg.id} className="relative flex flex-col pt-5">
+                  {badge && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
+                      <span className="bg-gradient-to-r from-primary to-secondary text-primary-foreground text-[10px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg ring-2 ring-background uppercase tracking-wider">
+                        {badge}
+                      </span>
+                    </div>
+                  )}
                 <Card
-                  key={pkg.id}
-                  className={`relative flex flex-col transition-all duration-300 hover:shadow-[0_20px_50px_rgba(107,0,246,0.12)] hover:-translate-y-1.5 border rounded-3xl overflow-hidden ${
+                  className={`relative flex flex-col flex-1 transition-all duration-300 hover:shadow-[0_20px_50px_rgba(107,0,246,0.12)] hover:-translate-y-1.5 border rounded-3xl overflow-hidden ${
                     isPopular
                       ? "border-primary/80 shadow-[0_10px_30px_rgba(107,0,246,0.08)] bg-gradient-to-b from-primary/[0.03] to-transparent"
                       : "border-border shadow-md bg-card"
@@ -253,14 +260,6 @@ export default function PricingPage() {
                 >
                   {isPopular && (
                     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-secondary to-primary" />
-                  )}
-
-                  {badge && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-primary to-secondary text-primary-foreground text-[10px] font-bold px-4.5 py-1.5 rounded-full whitespace-nowrap shadow-lg ring-2 ring-background uppercase tracking-wider">
-                        {badge}
-                      </span>
-                    </div>
                   )}
 
                   <CardHeader className="text-center pb-2 pt-8">
@@ -394,6 +393,7 @@ export default function PricingPage() {
                     )}
                   </CardContent>
                 </Card>
+                </div>
               );
             })}
           </div>
