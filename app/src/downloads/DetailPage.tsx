@@ -68,6 +68,8 @@ export default function DetailPage() {
   const { toast } = useToast();
   const [isRetrying, setIsRetrying] = useState(false);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
+
   const { data: download, isLoading, refetch } = useQuery(
     getDownloadById,
     { id: id! },
