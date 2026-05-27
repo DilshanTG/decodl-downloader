@@ -161,6 +161,16 @@ action updateIsUserAdminById {
   entities: [User]
 }
 
+action sendPhoneOtp {
+  fn: import { sendPhoneOtp } from "@src/user/operations",
+  entities: [User, PhoneOtp]
+}
+
+action verifyPhoneOtp {
+  fn: import { verifyPhoneOtp } from "@src/user/operations",
+  entities: [User, PhoneOtp, CreditTransaction]
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 route DashboardRoute { path: "/dashboard", to: DashboardPage }
 page DashboardPage {

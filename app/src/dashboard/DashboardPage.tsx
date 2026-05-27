@@ -10,6 +10,8 @@ import {
  getAssetInfo,
  getDecodlBalance,
 } from "wasp/client/operations";
+// @ts-ignore
+import { sendPhoneOtp, verifyPhoneOtp } from "wasp/client/operations";
 import { Link } from "wasp/client/router";
 import { routes } from "wasp/client/router";
 import { DOWNLOAD_STATUS_COLORS, DOWNLOAD_STATUS_LABELS } from "../shared/constants";
@@ -113,6 +115,11 @@ export default function DashboardPage() {
  const [selectedVariant, setSelectedVariant] = useState("normal");
  const [isSubmitting, setIsSubmitting] = useState(false);
  const [isClaimingBonus, setIsClaimingBonus] = useState(false);
+ const [otpStep, setOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+ const [otpCode, setOtpCode] = useState('');
+ const [otpLoading, setOtpLoading] = useState(false);
+ const [otpError, setOtpError] = useState<string | null>(null);
+ const [otpResendTimer, setOtpResendTimer] = useState(0);
 
  const [liveInfo, setLiveInfo] = useState<{
  calculatedCost: number;
@@ -525,6 +532,40 @@ export default function DashboardPage() {
  }
  };
 
+ const handleSendOtp = async () => {
+   setOtpLoading(true);
+   setOtpError(null);
+   try {
+     await (sendPhoneOtp as any)();
+     setOtpStep('sent');
+     setOtpResendTimer(60);
+     const interval = setInterval(() => {
+       setOtpResendTimer(t => { if (t <= 1) { clearInterval(interval); return 0; } return t - 1; });
+     }, 1000);
+   } catch (err: any) {
+     setOtpError(err?.message ?? 'Failed to send OTP. Please try again.');
+   } finally {
+     setOtpLoading(false);
+   }
+ };
+
+ const handleVerifyOtp = async () => {
+   if (!otpCode.trim()) { setOtpError('Enter the 6-digit code'); return; }
+   setOtpLoading(true);
+   setOtpError(null);
+   try {
+     const result = await (verifyPhoneOtp as any)({ code: otpCode.trim() });
+     setOtpStep('verified');
+     refetchBalance();
+     toast({ title: '🎉 Phone verified!', description: `2 free credits added. Balance: ${result.newBalance.toFixed(2)} cr` });
+     setTimeout(() => { urlInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); urlInputRef.current?.focus(); }, 400);
+   } catch (err: any) {
+     setOtpError(err?.message ?? 'Invalid code. Please try again.');
+   } finally {
+     setOtpLoading(false);
+   }
+ };
+
  return (
  <div className= "min-h-screen bg-background text-foreground">
  {/* Dashboard Hero Header */}
@@ -663,37 +704,64 @@ export default function DashboardPage() {
  <Card className= "border-border shadow-md flex flex-col justify-between"variant= "bento">
   <CardContent className= "pt-6 flex flex-col h-full justify-between">
   {user && !(user as any).freeCreditsClaimed ? (
-  <div className="flex flex-col h-full justify-between">
+  <div className="flex flex-col h-full justify-between gap-3">
     <div>
-      <div className= "flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2">
         <span className="text-base">🎁</span>
-        <CardTitle className= "text-base font-extrabold text-foreground">Welcome Gift Awaiting!</CardTitle>
+        <CardTitle className="text-base font-extrabold text-foreground">Get 2 Free Credits</CardTitle>
       </div>
-      <CardDescription className= "text-xs mb-3 leading-relaxed">
-        Claim your <strong>2.0 free trial credits</strong> instantly to test our high-speed downloader. No credit card required!
+      <CardDescription className="text-xs mb-3 leading-relaxed">
+        Verify your mobile number to instantly claim <strong>2 free credits</strong>. No credit card needed.
       </CardDescription>
     </div>
-    <Button
-      type="button"
-      onClick={handleClaimBonus}
-      disabled={isClaimingBonus}
-      className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-extrabold text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 cursor-pointer duration-200"
-    >
-      {isClaimingBonus ? (
-        <>
-          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-          Claiming...
-        </>
-      ) : (
-        <>
-          Claim 2 Free Credits Instantly
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-        </>
-      )}
-    </Button>
+
+    {otpStep === 'idle' && (
+      <>
+        {otpError && <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{otpError}</p>}
+        <Button
+          type="button"
+          onClick={handleSendOtp}
+          disabled={otpLoading}
+          className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-extrabold text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 cursor-pointer duration-200"
+        >
+          {otpLoading ? (
+            <><svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Sending OTP...</>
+          ) : <>📱 Send Verification Code</>}
+        </Button>
+      </>
+    )}
+
+    {otpStep === 'sent' && (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Enter the 6-digit code sent to your mobile.</p>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={otpCode}
+          onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '')); setOtpError(null); }}
+          placeholder="_ _ _ _ _ _"
+          className="w-full h-11 rounded-xl border border-input bg-background px-4 text-center text-xl font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        {otpError && <p className="text-xs text-destructive">{otpError}</p>}
+        <Button
+          type="button"
+          onClick={handleVerifyOtp}
+          disabled={otpLoading || otpCode.length < 6}
+          className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-extrabold text-xs py-3 rounded-xl"
+        >
+          {otpLoading ? 'Verifying...' : '✅ Verify & Claim 2 Credits'}
+        </Button>
+        <button
+          type="button"
+          onClick={handleSendOtp}
+          disabled={otpResendTimer > 0 || otpLoading}
+          className="w-full text-xs text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {otpResendTimer > 0 ? `Resend in ${otpResendTimer}s` : 'Resend code'}
+        </button>
+      </div>
+    )}
   </div>
   ) : (
  <div className= "flex flex-col justify-between h-full">

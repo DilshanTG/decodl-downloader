@@ -17,7 +17,8 @@ model User {
   isAdmin                Boolean              @default(false)
 
   name                   String?
-  phone                  String?
+  phone                  String?              @unique
+  phoneVerified          Boolean              @default(false)
 
   credits                Float                @default(0)
   reservedCredits        Float                @default(0)  // locked in active downloads — never deducted unless download succeeds
@@ -164,6 +165,16 @@ model Logs {
 
   message   String
   level     String
+}
+
+model PhoneOtp {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  userId    String
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
 }
 
 model ContactFormMessage {
