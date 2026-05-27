@@ -10,6 +10,39 @@ ARG REACT_APP_API_URL=https://api.stockmart.lk
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 RUN wasp build
 
+# Patch Wasp SDK: replace SMTP/Nodemailer with direct Resend HTTP API call
+RUN cat > /wasp-project/.wasp/out/sdk/wasp/dist/server/email/core/providers/smtp.js << 'RESEND_PATCH'
+import { formatFromField, getDefaultFromField } from "../helpers.js";
+export function initSmtpEmailSender(config) {
+  const apiKey = config.password;
+  const defaultFromField = getDefaultFromField();
+  return {
+    async send(email) {
+      const from = formatFromField(email.from || defaultFromField);
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from,
+          to: Array.isArray(email.to) ? email.to : [email.to],
+          subject: email.subject,
+          text: email.text,
+          html: email.html,
+        }),
+      });
+      if (!res.ok) {
+        const b = await res.text();
+        throw new Error("Resend API error " + res.status + ": " + b);
+      }
+      return res.json();
+    },
+  };
+}
+RESEND_PATCH
+
 # Stage 2: Build server — mirrors the generated Dockerfile exactly
 FROM node:22.22.2-alpine3.23 AS base
 RUN apk --no-cache -U upgrade
