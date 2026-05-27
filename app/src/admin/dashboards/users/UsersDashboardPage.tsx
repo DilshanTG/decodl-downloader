@@ -9,6 +9,8 @@ import {
 } from "wasp/client/operations";
 // @ts-ignore — type generated after wasp build
 import { adminGrantFreeCredits } from "wasp/client/operations";
+// @ts-ignore — type generated after wasp build
+import { adminDeleteUser } from "wasp/client/operations";
 import { type User } from "wasp/entities";
 import { type AuthUser } from "wasp/auth";
 import DefaultLayout from "../../layout/DefaultLayout";
@@ -118,6 +120,61 @@ function CreditModal({
   );
 }
 
+function DeleteUserModal({
+  user: targetUser,
+  onClose,
+  onDone,
+}: {
+  user: { id: string; email?: string | null };
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await (adminDeleteUser as any)({ userId: targetUser.id });
+      toast({ title: "User deleted", description: `${targetUser.email ?? targetUser.id} has been permanently deleted.` });
+      onDone();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message ?? "Failed to delete user.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-extrabold text-foreground mb-1">Delete User?</h2>
+        <p className="text-sm text-muted-foreground mb-2">
+          You are about to permanently delete:
+        </p>
+        <p className="text-sm font-bold text-foreground mb-4 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-2">
+          {targetUser.email ?? targetUser.id}
+        </p>
+        <p className="text-xs text-muted-foreground mb-6">
+          This will delete all their downloads, payments, credit transactions, and account data. <strong className="text-destructive">This cannot be undone.</strong>
+        </p>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={loading}
+            onClick={handleDelete}
+            className="flex-1 rounded-xl font-bold"
+          >
+            {loading ? "Deleting..." : "Delete Permanently"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const UsersAdminPage = ({ user }: { user: AuthUser }) => {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,6 +182,7 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
   const [isAdminFilter, setIsAdminFilter] = useState<boolean | undefined>(undefined);
   const [hasPaidFilter, setHasPaidFilter] = useState<boolean | undefined>(undefined);
   const [creditModalUser, setCreditModalUser] = useState<any | null>(null);
+  const [deleteModalUser, setDeleteModalUser] = useState<any | null>(null);
 
   const debouncedEmailFilter = useDebounce(emailFilter, 300);
   const skipPages = currentPage - 1;
@@ -145,6 +203,13 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
           user={creditModalUser}
           onClose={() => setCreditModalUser(null)}
           onDone={() => { setCreditModalUser(null); refetch(); }}
+        />
+      )}
+      {deleteModalUser && (
+        <DeleteUserModal
+          user={deleteModalUser}
+          onClose={() => setDeleteModalUser(null)}
+          onDone={() => { setDeleteModalUser(null); refetch(); }}
         />
       )}
 
@@ -287,6 +352,16 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                           >
                             <a href={`/admin/downloads?userEmail=${encodeURIComponent(u.email ?? "")}`}>Downloads</a>
                           </Button>
+                          {!u.isAdmin && u.id !== user.id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 rounded-lg text-xs font-semibold px-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setDeleteModalUser(u)}
+                            >
+                              Delete
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

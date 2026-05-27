@@ -94,7 +94,7 @@ app stockmart {
   },
 
   emailSender: {
-    provider: SendGrid,
+    provider: SMTP,
     defaultFrom: {
       name: "StockMart.lk",
       email: "noreply@stockmart.lk"
@@ -396,6 +396,11 @@ action adminUpdateCreditPackage {
 action adminDeleteCreditPackage {
   fn: import { adminDeleteCreditPackage } from "@src/admin/operations",
   entities: [CreditPackage]
+}
+
+action adminDeleteUser {
+  fn: import { adminDeleteUser } from "@src/admin/operations",
+  entities: [User, Download, Payment, CreditTransaction, ContactFormMessage]
 }
 
 route AdminRoute { path: "/admin", to: AnalyticsDashboardPage }

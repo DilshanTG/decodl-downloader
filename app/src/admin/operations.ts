@@ -14,6 +14,7 @@ import type {
   AdminCreateCreditPackage,
   AdminUpdateCreditPackage,
   AdminDeleteCreditPackage,
+  AdminDeleteUser,
 } from 'wasp/server/operations'
 import { processDecodlSubmission } from 'wasp/server/jobs'
 import { invalidatePricingCache } from '../credits/operations'
@@ -588,5 +589,30 @@ export const adminDeleteCreditPackage: AdminDeleteCreditPackage<{ id: string }, 
 
   await prisma.creditPackage.delete({ where: { id } })
   invalidatePackagesCache()
+  return { success: true }
+}
+
+// ─── Delete User ──────────────────────────────────────────────────────────────
+
+export const adminDeleteUser: AdminDeleteUser<{ userId: string }, { success: boolean }> = async (
+  { userId },
+  context
+) => {
+  requireAdmin(context)
+  if (!userId) throw new HttpError(400, 'userId required')
+  if (context.user!.id === userId) throw new HttpError(400, 'Cannot delete your own account')
+
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) throw new HttpError(404, 'User not found')
+  if (user.isAdmin) throw new HttpError(400, 'Cannot delete an admin account')
+
+  // Delete related records before the user (no cascade defined on these)
+  await prisma.contactFormMessage.deleteMany({ where: { userId } })
+  await prisma.creditTransaction.deleteMany({ where: { userId } })
+  await prisma.payment.deleteMany({ where: { userId } })
+  await prisma.download.deleteMany({ where: { userId } })
+  // Auth → AuthIdentity → Session cascade automatically via schema onDelete: Cascade
+  await prisma.user.delete({ where: { id: userId } })
+
   return { success: true }
 }
