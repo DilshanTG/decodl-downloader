@@ -927,31 +927,6 @@ export default function DashboardPage() {
   )}
   </div>
   
-  {/* Try a Free Demo Link Sandbox Button */}
-  {!url && (
-    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground bg-muted/40 px-3.5 py-2.5 rounded-xl border border-border/40 duration-200">
-      <span className="flex items-center gap-1.5 font-medium">
-        <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-        New to StockMart?
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          setUrl("https://picsum.photos/id/237/200/300");
-          setSelectedVariant("normal");
-          setDuplicateWarning(false);
-          toast({
-            title: "💡 Free Demo Link loaded!",
-            description: "Check the 3-step verification checklist below running in free Sandbox Mode!",
-          });
-        }}
-        className="inline-flex items-center gap-1 font-bold text-primary hover:underline"
-      >
-        Try a Free Demo Link
-        <svg className="w-3 h-3 animate-bounce-horizontal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/></svg>
-      </button>
-    </div>
-  )}
   
   {/* Demo Sandbox Alert Indicator */}
   {url === "https://picsum.photos/id/237/200/300" && (
