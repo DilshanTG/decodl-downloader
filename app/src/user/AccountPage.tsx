@@ -55,6 +55,14 @@ export default function AccountPage({ user }: { user: User }) {
           </CardHeader>
           <Separator />
           <CardContent className="p-0 divide-y divide-border">
+            {!!(user as any).name && (
+              <div className="px-6 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4">
+                  <dt className="text-sm text-muted-foreground font-semibold">Full Name</dt>
+                  <dd className="text-sm text-foreground font-bold sm:col-span-2">{(user as any).name}</dd>
+                </div>
+              </div>
+            )}
             {!!user.email && (
               <div className="px-6 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4">
@@ -63,11 +71,11 @@ export default function AccountPage({ user }: { user: User }) {
                 </div>
               </div>
             )}
-            {!!user.username && (
+            {!!(user as any).phone && (
               <div className="px-6 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4">
-                  <dt className="text-sm text-muted-foreground font-semibold">Username</dt>
-                  <dd className="text-sm text-foreground font-bold sm:col-span-2">{user.username}</dd>
+                  <dt className="text-sm text-muted-foreground font-semibold">Phone Number</dt>
+                  <dd className="text-sm text-foreground font-bold sm:col-span-2">{(user as any).phone}</dd>
                 </div>
               </div>
             )}
@@ -98,14 +106,14 @@ export default function AccountPage({ user }: { user: User }) {
                 <dt className="text-sm text-muted-foreground font-semibold">Welcome bonus</dt>
                 <dd className="text-sm sm:col-span-2 font-bold">
                   {(user as any).freeCreditsClaimed ? (
-                    <span className="inline-flex items-center gap-1.5 text-green-600">
+                    <span className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-400">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
-                      Claimed
+                      2 credits granted
                     </span>
                   ) : (
-                    <span className="text-amber-500 font-semibold">Not claimed — <Link to={routes.DashboardRoute.to} className="underline hover:text-amber-600">claim on Dashboard</Link></span>
+                    <span className="text-amber-500 font-semibold">Pending admin approval</span>
                   )}
                 </dd>
               </div>

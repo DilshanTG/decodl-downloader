@@ -1,4 +1,9 @@
 import { useEffect, useMemo } from "react";
+
+// Auto-reload when a Vite chunk fails to load after a new deployment
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", () => window.location.reload());
+}
 import { Outlet, useLocation } from "react-router";
 import { useAuth } from "wasp/client/auth";
 import { routes } from "wasp/client/router";

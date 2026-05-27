@@ -6,6 +6,7 @@ import {
   Download,
   AlertTriangle,
   LayoutDashboard,
+  Package,
   Settings,
   ShoppingBag,
   Users,
@@ -30,6 +31,7 @@ const NAV_LINKS = [
   { to: "/admin/failed-downloads", label: "Failed Downloads", icon: AlertTriangle, end: true },
   { to: "/admin/payments", label: "Payments", icon: CreditCard, end: true },
   { to: "/admin/providers", label: "Providers", icon: Zap, end: true },
+  { to: "/admin/packages", label: "Credit Packages", icon: Package, end: true },
   { to: "/admin/credits", label: "Credit Ledger", icon: BarChart3, end: true },
   { to: "/admin/settings", label: "Settings", icon: Settings, end: true },
 ];

@@ -10,10 +10,15 @@ import type {
   AdminForceRetryDownload,
   AdminGetFailedDownloads,
   AdminSendPasswordReset,
+  AdminGetCreditPackages,
+  AdminCreateCreditPackage,
+  AdminUpdateCreditPackage,
+  AdminDeleteCreditPackage,
 } from 'wasp/server/operations'
 import { processDecodlSubmission } from 'wasp/server/jobs'
 import { invalidatePricingCache } from '../credits/operations'
-import { createPasswordResetLink } from 'wasp/server/auth'
+import { invalidatePackagesCache } from '../payment/operations'
+import { createPasswordResetLink } from 'wasp/server/auth/email'
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 function requireAdmin(context: any) {
@@ -286,30 +291,40 @@ export const adminAdjustUserCredits: AdminAdjustUserCredits<
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new HttpError(404, 'User not found')
 
-  const newBalance = Math.max(0, user.credits + amount)
+  if (amount < 0 && user.credits + amount < 0) {
+    throw new HttpError(400, `Cannot adjust balance below zero. User has ${user.credits} credits.`)
+  }
 
-  await Promise.all([
-    prisma.user.update({
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      credits: { increment: amount },
+      ...(amount > 0
+        ? { lifetimeCreditsEarned: { increment: amount } }
+        : { lifetimeCreditsSpent: { increment: Math.abs(amount) } }),
+    },
+  })
+
+  let finalBalance = updatedUser.credits
+  if (updatedUser.credits < 0) {
+    const correctedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        credits: newBalance,
-        ...(amount > 0
-          ? { lifetimeCreditsEarned: { increment: amount } }
-          : { lifetimeCreditsSpent: { increment: Math.abs(amount) } }),
-      },
-    }),
-    prisma.creditTransaction.create({
-      data: {
-        userId,
-        amount,
-        balance: newBalance,
-        type: 'admin_adjust',
-        description: `Admin adjustment: ${reason} (by admin ${adminUser.email ?? adminUser.id})`,
-      },
-    }),
-  ])
+      data: { credits: 0 },
+    })
+    finalBalance = correctedUser.credits
+  }
 
-  return { newBalance }
+  await prisma.creditTransaction.create({
+    data: {
+      userId,
+      amount,
+      balance: finalBalance,
+      type: 'admin_adjust',
+      description: `Admin adjustment: ${reason} (by admin ${adminUser.email ?? adminUser.id})`,
+    },
+  })
+
+  return { newBalance: finalBalance }
 }
 
 // ─── Update Provider Pricing ──────────────────────────────────────────────────
@@ -435,4 +450,143 @@ export const adminSendPasswordReset: AdminSendPasswordReset<
   const resetLink = await createPasswordResetLink(email, '/password-reset')
 
   return { resetLink, email }
+}
+
+// ─── Grant Free Credits (Admin Approve) ──────────────────────────────────────
+type AdminGrantFreeCreditsInput = { userId: string }
+
+// @ts-ignore — AdminGrantFreeCredits type generated after wasp build
+export const adminGrantFreeCredits = async ({ userId }: AdminGrantFreeCreditsInput, context: any) => {
+  requireAdmin(context)
+  if (!userId) throw new HttpError(400, 'userId required')
+
+  const BONUS = 2
+
+  const claimUpdate = await prisma.user.updateMany({
+    where: { id: userId, freeCreditsClaimed: false },
+    data: {
+      credits: { increment: BONUS },
+      lifetimeCreditsEarned: { increment: BONUS },
+      freeCreditsClaimed: true,
+    },
+  })
+
+  if (claimUpdate.count === 0) {
+    throw new HttpError(400, 'Free credits already granted or user not found')
+  }
+
+  const updatedUser = await prisma.user.findUnique({ where: { id: userId } })
+  const finalBalance = updatedUser?.credits ?? BONUS
+
+  await prisma.creditTransaction.create({
+    data: {
+      userId,
+      amount: BONUS,
+      balance: finalBalance,
+      type: 'admin_adjust',
+      description: 'Admin-approved welcome bonus (2 free credits)',
+    },
+  })
+
+  return { newBalance: finalBalance }
+}
+
+// ─── Credit Package CRUD ──────────────────────────────────────────────────────
+
+export const adminGetCreditPackages: AdminGetCreditPackages<void, any> = async (_args, context) => {
+  requireAdmin(context)
+  return prisma.creditPackage.findMany({ orderBy: { sortOrder: 'asc' } })
+}
+
+type AdminCreateCreditPackageInput = {
+  packageId: string
+  name: string
+  credits: number
+  priceLKR: number
+  badge?: string
+  isPopular?: boolean
+  isActive?: boolean
+  sortOrder?: number
+  description?: string
+}
+
+export const adminCreateCreditPackage: AdminCreateCreditPackage<AdminCreateCreditPackageInput, any> = async (
+  { packageId, name, credits, priceLKR, badge, isPopular = false, isActive = true, sortOrder = 0, description },
+  context
+) => {
+  requireAdmin(context)
+  if (!packageId?.trim()) throw new HttpError(400, 'Package ID is required')
+  if (!name?.trim())      throw new HttpError(400, 'Name is required')
+  if (!credits || credits <= 0) throw new HttpError(400, 'Credits must be greater than 0')
+  if (!priceLKR || priceLKR <= 0) throw new HttpError(400, 'Price must be greater than 0')
+
+  const existing = await prisma.creditPackage.findUnique({ where: { packageId } })
+  if (existing) throw new HttpError(400, `Package ID "${packageId}" already exists`)
+
+  const pkg = await prisma.creditPackage.create({
+    data: {
+      packageId: packageId.trim().toLowerCase(),
+      name: name.trim(),
+      credits,
+      priceLKR,
+      badge: badge?.trim() || null,
+      isPopular,
+      isActive,
+      sortOrder,
+      description: description?.trim() || null,
+    },
+  })
+  invalidatePackagesCache()
+  return pkg
+}
+
+type AdminUpdateCreditPackageInput = {
+  id: string
+  name?: string
+  credits?: number
+  priceLKR?: number
+  badge?: string | null
+  isPopular?: boolean
+  isActive?: boolean
+  sortOrder?: number
+  description?: string | null
+}
+
+export const adminUpdateCreditPackage: AdminUpdateCreditPackage<AdminUpdateCreditPackageInput, any> = async (
+  { id, name, credits, priceLKR, badge, isPopular, isActive, sortOrder, description },
+  context
+) => {
+  requireAdmin(context)
+  if (!id) throw new HttpError(400, 'Package ID required')
+  if (credits !== undefined && credits <= 0) throw new HttpError(400, 'Credits must be greater than 0')
+  if (priceLKR !== undefined && priceLKR <= 0) throw new HttpError(400, 'Price must be greater than 0')
+
+  const data: any = {}
+  if (name        !== undefined) data.name        = name.trim()
+  if (credits     !== undefined) data.credits     = credits
+  if (priceLKR    !== undefined) data.priceLKR    = priceLKR
+  if (badge       !== undefined) data.badge       = badge?.trim() || null
+  if (isPopular   !== undefined) data.isPopular   = isPopular
+  if (isActive    !== undefined) data.isActive    = isActive
+  if (sortOrder   !== undefined) data.sortOrder   = sortOrder
+  if (description !== undefined) data.description = description?.trim() || null
+
+  const pkg = await prisma.creditPackage.update({ where: { id }, data })
+  invalidatePackagesCache()
+  return pkg
+}
+
+export const adminDeleteCreditPackage: AdminDeleteCreditPackage<{ id: string }, { success: boolean }> = async (
+  { id },
+  context
+) => {
+  requireAdmin(context)
+  if (!id) throw new HttpError(400, 'Package ID required')
+
+  const pkg = await prisma.creditPackage.findUnique({ where: { id } })
+  if (!pkg) throw new HttpError(404, 'Package not found')
+
+  await prisma.creditPackage.delete({ where: { id } })
+  invalidatePackagesCache()
+  return { success: true }
 }

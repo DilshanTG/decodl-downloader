@@ -131,6 +131,93 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── SUPPORTED PLATFORMS ─────────────────────────────────────────────── */}
+      <section className="py-24 px-4 bg-muted/30" id="platforms">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary mb-3 block">Supported Platforms</span>
+            <h2 className="text-4xl sm:text-5xl font-black tracking-tight mb-4">Download From 20+ Sources</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">Access the world's top stock libraries through a single StockMart account — all billed in LKR.</p>
+          </div>
+
+          {/* Category tabs */}
+          {[
+            {
+              label: "Images & Vectors",
+              providers: [
+                { slug: "shutterstock",      name: "Shutterstock",      cost: "from 1 cr" },
+                { slug: "adobestock",        name: "Adobe Stock",       cost: "from 1 cr" },
+                { slug: "freepik",           name: "Freepik",           cost: "from 1 cr" },
+                { slug: "istockphoto",       name: "iStockphoto",       cost: "from 1.5 cr" },
+                { slug: "envato_elements",   name: "Envato Elements",   cost: "from 1 cr" },
+                { slug: "depositphotos",     name: "DepositPhotos",     cost: "from 1 cr" },
+                { slug: "dreamstime",        name: "Dreamstime",        cost: "from 1.5 cr" },
+                { slug: "alamy",             name: "Alamy",             cost: "from 1 cr" },
+                { slug: "123rf",             name: "123RF",             cost: "from 1 cr" },
+                { slug: "rawpixel",          name: "Rawpixel",          cost: "from 1 cr" },
+                { slug: "pngtree",           name: "PNGTree",           cost: "from 1 cr" },
+                { slug: "yellowimages",      name: "Yellow Images",     cost: "from 30 cr" },
+              ],
+            },
+            {
+              label: "Icons & UI",
+              providers: [
+                { slug: "flaticon",          name: "Flaticon",          cost: "from 0.2 cr" },
+                { slug: "vecteezy",          name: "Vecteezy",          cost: "from 1 cr" },
+                { slug: "vectorstock",       name: "VectorStock",       cost: "from 1 cr" },
+                { slug: "iconscout",         name: "Iconscout",         cost: "from 1 cr" },
+                { slug: "creative_fabrica",  name: "Creative Fabrica",  cost: "from 1 cr" },
+                { slug: "vexels",            name: "Vexels",            cost: "from 1 cr" },
+                { slug: "ui8",               name: "UI8",               cost: "from 1 cr" },
+              ],
+            },
+            {
+              label: "Video & Motion",
+              providers: [
+                { slug: "shutterstock_video",  name: "Shutterstock Video", cost: "from 5 cr" },
+                { slug: "adobestock_video",    name: "Adobe Stock Video",  cost: "from 5 cr" },
+                { slug: "istockphoto_video",   name: "iStock Video",       cost: "from 5 cr" },
+                { slug: "motionarray",         name: "Motion Array",       cost: "from 1 cr" },
+              ],
+            },
+          ].map((cat) => (
+            <div key={cat.label} className="mb-12">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-sm font-extrabold uppercase tracking-widest text-foreground">{cat.label}</span>
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs font-semibold text-muted-foreground">{cat.providers.length} platforms</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {cat.providers.map((p) => (
+                  <div key={p.slug} className="group flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200 p-4 cursor-default">
+                    <div className="w-full h-9 flex items-center justify-center bg-white rounded-xl px-2">
+                      <img
+                        src={`/provider-logos/png/${p.slug}.png`}
+                        alt={p.name}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (!img.dataset.tried) { img.dataset.tried = "1"; img.src = `/provider-logos/${p.slug}.svg`; }
+                          else img.style.display = "none";
+                        }}
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-foreground leading-tight">{p.name}</p>
+                      <p className="text-[10px] text-primary font-semibold mt-0.5">{p.cost}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div className="text-center mt-4">
+            <p className="text-sm text-muted-foreground">More platforms added regularly. <a href="/contact" className="text-primary font-bold hover:underline">Request a platform →</a></p>
+          </div>
+        </div>
+      </section>
+
       {/* ── WHAT CAN YOU DOWNLOAD ────────────────────────────────────────────── */}
       <section className="py-24 px-4">
         <div className="max-w-6xl mx-auto">

@@ -101,31 +101,25 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
           })
           if (syncClaimed.count === 0) return
 
-          const dbUser = await context.entities.User.findUnique({ where: { id: userId } })
-          if (!dbUser) return
+          const updatedUser = await context.entities.User.update({
+            where: { id: userId },
+            data: {
+              credits: { increment: payment.creditsAwarded },
+              lifetimeCreditsEarned: { increment: payment.creditsAwarded },
+              lifetimeSpentLKR: { increment: payment.amountLKR },
+            },
+          })
 
-          const estimatedBalance = dbUser.credits + payment.creditsAwarded
-
-          await Promise.all([
-            context.entities.User.update({
-              where: { id: userId },
-              data: {
-                credits: { increment: payment.creditsAwarded },
-                lifetimeCreditsEarned: { increment: payment.creditsAwarded },
-                lifetimeSpentLKR: { increment: payment.amountLKR },
-              },
-            }),
-            context.entities.CreditTransaction.create({
-              data: {
-                userId,
-                amount: payment.creditsAwarded,
-                balance: estimatedBalance,
-                type: 'purchase',
-                reference: payment.id,
-                description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Sync: ${payment.payhereOrderId})`,
-              },
-            }),
-          ])
+          await context.entities.CreditTransaction.create({
+            data: {
+              userId,
+              amount: payment.creditsAwarded,
+              balance: updatedUser.credits,
+              type: 'purchase',
+              reference: payment.id,
+              description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Sync: ${payment.payhereOrderId})`,
+            },
+          })
 
           console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${userId}`)
 

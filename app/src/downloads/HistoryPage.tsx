@@ -303,7 +303,7 @@ export default function HistoryPage() {
                               href={getDownloadUrl(d.id, d.downloadToken)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-all shadow-sm shadow-green-500/20 active:scale-95"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm shadow-primary/20 active:scale-95"
                             >
                               <Download className="w-3.5 h-3.5" />
                               Save File

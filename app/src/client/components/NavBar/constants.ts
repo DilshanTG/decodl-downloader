@@ -5,7 +5,6 @@ import {
   History,
   Coins,
   CreditCard,
-  MessageSquare,
   Zap,
   HelpCircle,
   Users,
@@ -30,5 +29,4 @@ export const appNavigationItems: NavigationItem[] = [
   { name: "Credits", to: routes.CreditsRoute.to, icon: Coins },
   { name: "Pricing", to: routes.PricingPageRoute.to, icon: CreditCard },
   { name: "Contact", to: "/contact", icon: Phone },
-  { name: "Support", to: "https://wa.me/94772503124", icon: MessageSquare },
 ] as const;

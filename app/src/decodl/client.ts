@@ -201,9 +201,9 @@ export async function checkDecodlJobStatus(jobId: string): Promise<DecodlStatusR
   const errorCode = data.errorCode || data.code;
   const rawError = data.error || (data.status === 'failed' ? data.message : null);
 
-  if (rawError || errorCode) {
-    let friendlyMessage = rawError || 'Download failed';
-    const key = (errorCode || rawError || '').toString().toLowerCase();
+  if (rawError || errorCode || data.status === 'failed') {
+    let friendlyMessage = rawError || data.message || 'Download failed';
+    const key = (errorCode || rawError || friendlyMessage).toString().toLowerCase();
     if (ERROR_MAPPINGS[key]) {
       friendlyMessage = ERROR_MAPPINGS[key];
     }

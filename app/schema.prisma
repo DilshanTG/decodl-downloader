@@ -16,6 +16,9 @@ model User {
   username               String?              @unique
   isAdmin                Boolean              @default(false)
 
+  name                   String?
+  phone                  String?
+
   credits                Float                @default(0)
   reservedCredits        Float                @default(0)  // locked in active downloads — never deducted unless download succeeds
   lifetimeCreditsEarned  Float                @default(0)
@@ -110,6 +113,22 @@ model ProviderPricing {
   optionsConfig   Json?
 
   @@unique([slug, variant])
+}
+
+model CreditPackage {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packageId   String   @unique
+  name        String
+  credits     Float
+  priceLKR    Int
+  badge       String?
+  isPopular   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  description String?
 }
 
 model DailyStats {

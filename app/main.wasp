@@ -81,6 +81,7 @@ app stockmart {
   db: {
     seeds: [
       import { seedProviderPricing } from "@src/server/scripts/dbSeeds",
+      import { seedCreditPackages } from "@src/server/scripts/dbSeeds",
     ]
   },
 
@@ -238,9 +239,14 @@ action claimSignupBonus {
 }
 
 // ─── Payment (PayHere) ────────────────────────────────────────────────────────
+query getCreditPackages {
+  fn: import { getCreditPackages } from "@src/payment/operations",
+  entities: [CreditPackage]
+}
+
 action createPayherePayment {
   fn: import { createPayherePayment } from "@src/payment/operations",
-  entities: [User, Payment]
+  entities: [User, Payment, CreditPackage]
 }
 
 api payhereWebhook {
@@ -367,6 +373,31 @@ action adminSendPasswordReset {
   entities: [User]
 }
 
+action adminGrantFreeCredits {
+  fn: import { adminGrantFreeCredits } from "@src/admin/operations",
+  entities: [User, CreditTransaction]
+}
+
+query adminGetCreditPackages {
+  fn: import { adminGetCreditPackages } from "@src/admin/operations",
+  entities: [CreditPackage]
+}
+
+action adminCreateCreditPackage {
+  fn: import { adminCreateCreditPackage } from "@src/admin/operations",
+  entities: [CreditPackage]
+}
+
+action adminUpdateCreditPackage {
+  fn: import { adminUpdateCreditPackage } from "@src/admin/operations",
+  entities: [CreditPackage]
+}
+
+action adminDeleteCreditPackage {
+  fn: import { adminDeleteCreditPackage } from "@src/admin/operations",
+  entities: [CreditPackage]
+}
+
 route AdminRoute { path: "/admin", to: AnalyticsDashboardPage }
 page AnalyticsDashboardPage {
   authRequired: true,
@@ -407,6 +438,12 @@ route AdminSettingsRoute { path: "/admin/settings", to: AdminSettingsPage }
 page AdminSettingsPage {
   authRequired: true,
   component: import AdminSettings from "@src/admin/elements/settings/SettingsPage"
+}
+
+route AdminPackagesRoute { path: "/admin/packages", to: AdminPackagesPage }
+page AdminPackagesPage {
+  authRequired: true,
+  component: import AdminPackagesPage from "@src/admin/dashboards/packages/AdminPackagesPage"
 }
 
 route AdminFailedDownloadsRoute { path: "/admin/failed-downloads", to: AdminFailedDownloadsPage }

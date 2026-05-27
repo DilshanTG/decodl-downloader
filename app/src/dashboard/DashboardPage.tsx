@@ -132,6 +132,11 @@ export default function DashboardPage() {
  const [bulkSelectedProvider, setBulkSelectedProvider] = useState("");
 
  const isUrlMode = url.includes(".") || url.includes("/") || url.startsWith("http");
+ const isSearchQuery = url.trim().length > 0 &&
+    !url.includes("/") &&
+    !url.includes(".") &&
+    isNaN(Number(url.trim())) &&
+    (url.trim().split(/\s+/).length > 1 || /^[a-zA-Z\s]+$/.test(url.trim()));
  const detectedSlug = isUrlMode
  ? (url.length > 5 ? detectProvider(url) : null)
  : (manuallySelectedProvider || null);
@@ -146,7 +151,6 @@ export default function DashboardPage() {
  id: string; type: "success"|"error"; title: string; body: string; read: boolean; ts: number;
  }>>([]);
  const [notifOpen, setNotifOpen] = useState(false);
- const [sandboxOpen, setSandboxOpen] = useState(false);
  const [duplicateWarning, setDuplicateWarning] = useState(false);
  const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -627,40 +631,71 @@ export default function DashboardPage() {
  ⏳ {reservedAmount.toFixed(1)} credits temporarily held while your downloads process — automatically returned if anything fails
  </p>
  )}
- <Link
- to={routes.PricingPageRoute.to}
- className= "inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline mt-1"
- >
- <svg className= "w-3 h-3"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M12 4v16m8-8H4"/>
- </svg>
- Top up credits
- </Link>
- </CardContent>
- </Card>
+    <div className="flex flex-col gap-2 mt-2 border-t border-border/40 pt-3">
+    <div className="flex items-center justify-between">
+      <Link
+      to={routes.PricingPageRoute.to}
+      className= "inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+      >
+      <svg className= "w-3 h-3"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
+      <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M12 4v16m8-8H4"/>
+      </svg>
+      Top up credits
+      </Link>
+      <span className="text-[10px] text-muted-foreground/60 font-semibold flex items-center gap-1">
+        <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+        LKR Billed
+      </span>
+    </div>
+    
+    {/* Trust Badges */}
+    <div className="flex items-center gap-2 mt-1 bg-muted/30 px-2.5 py-1.5 rounded-lg border border-border/30 text-[9px] text-muted-foreground/75">
+      <span className="font-bold whitespace-nowrap text-muted-foreground/60">Secured LKR Payments:</span>
+      <div className="flex items-center gap-1.5 font-extrabold text-foreground/80">
+        <span>Visa</span> · <span>Mastercard</span> · <span>eZ Cash</span> · <span>Genie</span>
+      </div>
+    </div>
+  </div>
+  </CardContent>
+  </Card>
 
- {/* Signup bonus / quick stats */}
+ {/* Welcome bonus / quick stats */}
  <Card className= "border-border shadow-md flex flex-col justify-between"variant= "bento">
- <CardContent className= "pt-6 flex flex-col h-full justify-between">
- {user && !(user as any).freeCreditsClaimed ? (
- <div>
- <div className= "flex items-center gap-2 mb-2">
- <span className= "text-2xl">🎁</span>
- <CardTitle className= "text-base font-bold">Claim 2 Free Credits</CardTitle>
- </div>
- <CardDescription className= "text-xs mb-5">
- Welcome bonus for new members. Try downloading a premium vector or photo for free!
- </CardDescription>
- <Button
- onClick={handleClaimBonus}
- disabled={isClaimingBonus}
- variant= "secondary"
- className= "w-full sm:w-auto font-bold rounded-xl border border-border"
- >
- {isClaimingBonus ?"Claiming...": "Claim Free Credits"}
- </Button>
- </div>
- ) : (
+  <CardContent className= "pt-6 flex flex-col h-full justify-between">
+  {user && !(user as any).freeCreditsClaimed ? (
+  <div className="flex flex-col h-full justify-between">
+    <div>
+      <div className= "flex items-center gap-2 mb-2">
+        <span className="text-base">🎁</span>
+        <CardTitle className= "text-base font-extrabold text-foreground">Welcome Gift Awaiting!</CardTitle>
+      </div>
+      <CardDescription className= "text-xs mb-3 leading-relaxed">
+        Claim your <strong>2.0 free trial credits</strong> instantly to test our high-speed downloader. No credit card required!
+      </CardDescription>
+    </div>
+    <Button
+      type="button"
+      onClick={handleClaimBonus}
+      disabled={isClaimingBonus}
+      className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-95 text-white font-extrabold text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 cursor-pointer duration-200"
+    >
+      {isClaimingBonus ? (
+        <>
+          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Claiming...
+        </>
+      ) : (
+        <>
+          Claim 2 Free Credits Instantly
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </>
+      )}
+    </Button>
+  </div>
+  ) : (
  <div className= "flex flex-col justify-between h-full">
  <div>
  <span className= "text-xs uppercase font-bold tracking-wider text-muted-foreground block mb-4">
@@ -783,46 +818,106 @@ export default function DashboardPage() {
  </details>
  </div>
  <div className= "relative">
- <input
- ref={urlInputRef}
- type= "text"
- value={url}
- onChange={(e) => {
- setUrl(e.target.value);
- setSelectedVariant("normal");
- setDuplicateWarning(false);
- }}
- placeholder= "https://www.shutterstock.com/... OR Shutterstock code e.g. 1883031073"
- className= "w-full border border-border bg-background text-foreground rounded-xl px-4 py-3.5 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-inner"
- />
- {!url && (
- <button
- type= "button"
- onClick={async () => {
- try {
- const text = await navigator.clipboard.readText();
- if (text) { setUrl(text); setSelectedVariant("normal"); setDuplicateWarning(false); }
- } catch {
- toast({ title: "Clipboard access denied", description: "Please paste manually.", variant: "destructive"});
- }
- }}
- className= "absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-lg transition-colors"
- >
- Paste
- </button>
- )}
- {url && (
- <button
- type= "button"
- onClick={() => { setUrl(""); setSelectedVariant("normal"); setDuplicateWarning(false); setLiveInfo(null); setAssetError(null); setSelectedFormat(""); }}
- className= "absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
- >
- <svg className= "w-4 h-4"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M6 18L18 6M6 6l12 12"/>
- </svg>
- </button>
- )}
- </div>
+  <input
+  ref={urlInputRef}
+  type= "text"
+  value={url}
+  onChange={(e) => {
+  setUrl(e.target.value);
+  setSelectedVariant("normal");
+  setDuplicateWarning(false);
+  }}
+  placeholder= "https://www.shutterstock.com/... OR Shutterstock code e.g. 1883031073"
+  className= "w-full border border-border bg-background text-foreground rounded-xl px-4 py-3.5 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-inner"
+  />
+  {!url && (
+  <button
+  type= "button"
+  onClick={async () => {
+  try {
+  const text = await navigator.clipboard.readText();
+  if (text) { setUrl(text); setSelectedVariant("normal"); setDuplicateWarning(false); }
+  } catch {
+  toast({ title: "Clipboard access denied", description: "Please paste manually.", variant: "destructive"});
+  }
+  }}
+  className= "absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-lg transition-colors"
+  >
+  Paste
+  </button>
+  )}
+  {url && (
+  <button
+  type= "button"
+  onClick={() => { setUrl(""); setSelectedVariant("normal"); setDuplicateWarning(false); setLiveInfo(null); setAssetError(null); setSelectedFormat(""); }}
+  className= "absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+  >
+  <svg className= "w-4 h-4"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
+  <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M6 18L18 6M6 6l12 12"/>
+  </svg>
+  </button>
+  )}
+  </div>
+  
+  {/* Try a Free Demo Link Sandbox Button */}
+  {!url && (
+    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground bg-muted/40 px-3.5 py-2.5 rounded-xl border border-border/40 duration-200">
+      <span className="flex items-center gap-1.5 font-medium">
+        <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        New to StockMart?
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          setUrl("https://picsum.photos/id/237/200/300");
+          setSelectedVariant("normal");
+          setDuplicateWarning(false);
+          toast({
+            title: "💡 Free Demo Link loaded!",
+            description: "Check the 3-step verification checklist below running in free Sandbox Mode!",
+          });
+        }}
+        className="inline-flex items-center gap-1 font-bold text-primary hover:underline"
+      >
+        Try a Free Demo Link
+        <svg className="w-3 h-3 animate-bounce-horizontal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  )}
+  
+  {/* Demo Sandbox Alert Indicator */}
+  {url === "https://picsum.photos/id/237/200/300" && (
+    <div className="mt-3 rounded-xl border border-green-500/20 bg-green-500/5 p-3.5 flex gap-2.5 items-start duration-200">
+      <span className="text-sm mt-0.5">💡</span>
+      <p className="text-xs text-green-700 dark:text-green-400 font-bold leading-relaxed">
+        <strong>Sandbox Mode Activated:</strong> You have loaded a free test image. Click <strong>"Download File"</strong> below to see the instant delivery speed in action at <strong>0 credits</strong> cost!
+      </p>
+    </div>
+  )}
+  
+  {/* Smart Search Query Prevention - English-only Error Banner */}
+  {isSearchQuery && (
+    <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4.5 flex gap-3.5 items-start duration-200">
+      <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+      </div>
+      <div>
+        <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
+          🔍 It looks like you entered a search term!
+        </h4>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          StockMart is an <strong>instant downloader</strong>, not a search engine. To download your file:
+        </p>
+        <ol className="list-decimal list-inside text-[11px] text-muted-foreground/80 mt-2 space-y-1">
+          <li>Go to a stock site like <strong>Freepik.com</strong> or <strong>Shutterstock.com</strong>.</li>
+          <li>Find the image or video you need and <strong>copy its complete link (URL)</strong> from your browser address bar.</li>
+          <li>Go back to StockMart and <strong>paste that link here</strong>.</li>
+        </ol>
+      </div>
+    </div>
+  )}
  </div>
 
  {/* Duplicate URL warning */}
@@ -878,185 +973,203 @@ export default function DashboardPage() {
  )}
 
  {/* ── 3-Step Asset Verification Panel ── */}
- {url.trim().length > 0 && (() => {
- const s1 = detectedSlug ?"success": url.trim().length > 5 ?"warning": "idle";
- const s2 = s1 !== "success"?"idle"
- : liveInfoLoading ?"loading"
- : assetError ? (assetError.type === "not-supported"?"editorial": assetError.type === "no-package"?"warning": "error")
- : liveInfo ?"success"
- : "idle";
- const assetCost = liveInfo?.calculatedCost ?? matchedPricing?.creditCost;
- const s3 = s2 !== "success"|| assetCost == null ?"idle"
- : decodlShortfall ?"error"
- : creditBalance >= assetCost ?"success": "warning";
-
- const providerLabel = (pricingData as any[])?.find((p: any) => p.slug === detectedSlug)?.displayName || detectedSlug ||"";
-
- const Dot = ({ s }: { s: string }) => {
-    if (s === "loading") return (
-      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(107,0,246,0.15)]">
-        <svg className="animate-spin w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>
-      </div>
-    );
-    if (s === "success") return (
-      <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(34,197,94,0.15)]">
-        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
-        </svg>
-      </div>
-    );
-    if (s === "warning" || s === "editorial") return (
-      <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.15)]">
-        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-        </svg>
-      </div>
-    );
-    if (s === "error" || s === "not-found") return (
-      <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.15)]">
-        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </div>
-    );
-    return (
-      <div className="w-8 h-8 rounded-full bg-muted/40 border border-border flex items-center justify-center shrink-0">
-        <div className="w-2 h-2 rounded-full bg-muted-foreground/30"/>
-      </div>
-    );
-  };
-
-  const Badge = ({ label, color }: { label: string; color: string }) => (
-    <span className={`inline-flex items-center shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border shadow-sm ${color}`}>
-      {label}
-    </span>
+ {(() => {
+  if (isSearchQuery) return null;
+  
+  const hasUrl = url.trim().length > 0;
+  const s1 = !hasUrl ? "idle" : detectedSlug ?"success": url.trim().length > 5 ?"warning": "idle";
+  const s2 = s1 !== "success"?"idle"
+  : liveInfoLoading ?"loading"
+  : assetError ? (assetError.type === "not-supported"?"editorial": assetError.type === "no-package"?"warning": "error")
+  : liveInfo ?"success"
+  : "idle";
+  const assetCost = liveInfo?.calculatedCost ?? matchedPricing?.creditCost;
+  const s3 = s2 !== "success"|| assetCost == null ?"idle"
+  : decodlShortfall ?"error"
+  : creditBalance >= assetCost ?"success": "warning";
+ 
+  const providerLabel = (pricingData as any[])?.find((p: any) => p.slug === detectedSlug)?.displayName || detectedSlug ||"";
+ 
+  const Dot = ({ s }: { s: string }) => {
+     if (s === "loading") return (
+       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(107,0,246,0.15)]">
+         <svg className="animate-spin w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24">
+           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+         </svg>
+       </div>
+     );
+     if (s === "success") return (
+       <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(34,197,94,0.15)]">
+         <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+         </svg>
+       </div>
+     );
+     if (s === "warning" || s === "editorial") return (
+       <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.15)]">
+         <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+         </svg>
+       </div>
+     );
+     if (s === "error" || s === "not-found") return (
+       <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.15)]">
+         <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+         </svg>
+       </div>
+     );
+     return (
+       <div className="w-8 h-8 rounded-full bg-muted/40 border border-border flex items-center justify-center shrink-0">
+         <div className="w-2 h-2 rounded-full bg-muted-foreground/30"/>
+       </div>
+     );
+   };
+ 
+   const Badge = ({ label, color }: { label: string; color: string }) => (
+     <span className={`inline-flex items-center shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border shadow-sm ${color}`}>
+       {label}
+     </span>
+   );
+ 
+   return (
+     <div className="mb-5 rounded-2xl border border-border/85 bg-card/65 backdrop-blur-md shadow-lg shadow-black/[0.02] overflow-hidden duration-300 hover:shadow-xl transition-shadow">
+ 
+       {/* Step 1 — Provider Detection */}
+       <div className={`flex items-center justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s1 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+         <div className="flex items-center gap-3.5 min-w-0">
+           <Dot s={s1} />
+           <div className="min-w-0">
+             <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Provider</p>
+             {s1 === "success" && (
+               <div className="flex items-center gap-2 min-w-0">
+                 <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto shrink-0 object-contain"
+                   onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                 <span className="text-sm font-extrabold text-foreground truncate">{providerLabel}</span>
+               </div>
+             )}
+             {s1 === "warning" && (
+               <div>
+                 <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Provider not recognised</p>
+                 <p className="text-[10px] text-muted-foreground/80 mt-0.5 leading-relaxed">Supported: Shutterstock, Freepik, Adobe Stock, Envato, Alamy, iStock, Flaticon & more</p>
+               </div>
+             )}
+             {s1 === "idle" && (
+               <div>
+                 <p className="text-xs font-bold text-muted-foreground/45">1. Detect Website</p>
+                 <p className="text-[10px] text-muted-foreground/35 mt-0.5 leading-normal">Pasted URLs are auto-detected (e.g. Freepik, Shutterstock, Envato)</p>
+               </div>
+             )}
+           </div>
+         </div>
+         {s1 === "success" && <Badge label="Detected" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+         {s1 === "warning" && <Badge label="Unknown" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+       </div>
+ 
+       {/* Step 2 — Asset Verification */}
+       <div className={`flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s2 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+         <div className="flex items-start gap-3.5 min-w-0">
+           <Dot s={s2} />
+           <div className="min-w-0">
+             <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">File Check</p>
+             {s2 === "idle" && (
+               <div>
+                 <p className="text-xs font-bold text-muted-foreground/45">2. Check File & pricing</p>
+                 <p className="text-[10px] text-muted-foreground/35 mt-0.5 leading-normal">System verifies asset is active and calculates the LKR credit cost</p>
+               </div>
+             )}
+             {s2 === "loading" && <p className="text-sm font-bold text-primary animate-pulse">Checking file... <span className="text-xs font-normal text-muted-foreground">(0 credits charged)</span></p>}
+             {s2 === "success" && assetCost != null && (
+               <p className="text-sm font-extrabold text-foreground">
+                 Available · <span className="text-primary font-black">{assetCost} {assetCost === 1 ? "credit" : "credits"}</span>
+               </p>
+             )}
+             {s2 === "editorial" && (
+               <div>
+                 <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">Editorial — Restricted</p>
+                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">Licensed for news use only. Cannot be downloaded.</p>
+               </div>
+             )}
+             {s2 === "warning" && assetError?.type === "no-package" && (
+               <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Temporarily Busy — Try Again Later</p>
+             )}
+             {s2 === "error" && assetError && (
+               <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                 {assetError.type === "not-found" ? "File Not Found" : "Could Not Check File"}
+               </p>
+             )}
+           </div>
+         </div>
+         {s2 === "success" && assetCost != null && <Badge label={`${assetCost} cr`} color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+         {s2 === "editorial" && <Badge label="Editorial" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+         {(s2 === "warning" && assetError?.type === "no-package") && <Badge label="Unavailable" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+         {s2 === "error" && <Badge label={assetError?.type === "not-found" ? "Not Found" : "Check Failed"} color="text-red-700 dark:text-red-400 bg-red-500/5 border-red-500/20"/>}
+       </div>
+ 
+       {/* Step 3 — Credit Check */}
+       <div className={`flex items-start justify-between gap-3 px-5 py-4 transition-colors duration-200 ${s3 === "success" ? "bg-green-500/[0.01]" : ""}`}>
+         <div className="flex items-start gap-3.5 min-w-0">
+           <Dot s={s3} />
+           <div className="min-w-0">
+             <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Credits</p>
+             {s3 === "idle" && (
+               <div>
+                 <p className="text-xs font-bold text-muted-foreground/45">3. Credit Balance Check</p>
+                 <p className="text-[10px] text-muted-foreground/35 mt-0.5 leading-normal">System verifies your balance is sufficient to perform download</p>
+               </div>
+             )}
+             {s3 === "success" && assetCost != null && (
+               <p className="text-sm font-extrabold text-foreground">
+                 <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> remaining after download
+               </p>
+             )}
+             {s3 === "error" && decodlShortfall && assetCost != null && (
+               <div>
+                 <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
+                   Service temporarily low on capacity
+                 </p>
+                 <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+                   Please contact our support team via WhatsApp and we will download your file manually within a few minutes!
+                 </p>
+                 <a
+                   href="https://wa.me/94772503124"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="inline-flex items-center gap-2 text-xs font-bold bg-[#25D366] text-white px-3.5 py-2 rounded-xl hover:opacity-90 active:scale-[0.98] transition-opacity shadow-sm shadow-[#25d366]/20"
+                 >
+                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white shrink-0">
+                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                   </svg>
+                   Contact Support on WhatsApp
+                 </a>
+               </div>
+             )}
+             {s3 === "warning" && assetCost != null && (
+               <div className="flex flex-wrap items-center gap-3">
+                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                   Requires {assetCost} cr · You have {creditBalance.toFixed(1)} cr
+                 </p>
+                 <Link
+                   to={routes.PricingPageRoute.to}
+                   className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-md shadow-primary/10"
+                 >
+                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
+                   </svg>
+                   Buy Credits
+                 </Link>
+               </div>
+             )}
+           </div>
+         </div>
+         {s3 === "success" && <Badge label="OK" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
+         {s3 === "warning" && <Badge label="Top Up" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
+       </div>
+ 
+     </div>
   );
-
-  return (
-    <div className="mb-5 rounded-2xl border border-border/85 bg-card/65 backdrop-blur-md shadow-lg shadow-black/[0.02] overflow-hidden duration-300 hover:shadow-xl transition-shadow">
-
-      {/* Step 1 — Provider Detection */}
-      <div className={`flex items-center justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s1 === "success" ? "bg-green-500/[0.01]" : ""}`}>
-        <div className="flex items-center gap-3.5 min-w-0">
-          <Dot s={s1} />
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Provider</p>
-            {s1 === "success" && (
-              <div className="flex items-center gap-2 min-w-0">
-                <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto shrink-0 object-contain"
-                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                <span className="text-sm font-extrabold text-foreground truncate">{providerLabel}</span>
-              </div>
-            )}
-            {s1 === "warning" && (
-              <div>
-                <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Provider not recognised</p>
-                <p className="text-[10px] text-muted-foreground/80 mt-0.5 leading-relaxed">Supported: Shutterstock, Freepik, Adobe Stock, Envato, Alamy, iStock, Flaticon & more</p>
-              </div>
-            )}
-            {s1 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting for URL or code...</p>}
-          </div>
-        </div>
-        {s1 === "success" && <Badge label="Detected" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
-        {s1 === "warning" && <Badge label="Unknown" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
-      </div>
-
-      {/* Step 2 — Asset Verification */}
-      <div className={`flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50 transition-colors duration-200 ${s2 === "success" ? "bg-green-500/[0.01]" : ""}`}>
-        <div className="flex items-start gap-3.5 min-w-0">
-          <Dot s={s2} />
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">File Check</p>
-            {s2 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting for provider check...</p>}
-            {s2 === "loading" && <p className="text-sm font-bold text-primary animate-pulse">Checking file... <span className="text-xs font-normal text-muted-foreground">(0 credits charged)</span></p>}
-            {s2 === "success" && assetCost != null && (
-              <p className="text-sm font-extrabold text-foreground">
-                Available · <span className="text-primary font-black">{assetCost} {assetCost === 1 ? "credit" : "credits"}</span>
-              </p>
-            )}
-            {s2 === "editorial" && (
-              <div>
-                <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">Editorial — Restricted</p>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">Licensed for news use only. Cannot be downloaded.</p>
-              </div>
-            )}
-            {s2 === "warning" && assetError?.type === "no-package" && (
-              <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Temporarily Busy — Try Again Later</p>
-            )}
-            {s2 === "error" && assetError && (
-              <p className="text-sm font-bold text-red-600 dark:text-red-400">
-                {assetError.type === "not-found" ? "File Not Found" : "Could Not Check File"}
-              </p>
-            )}
-          </div>
-        </div>
-        {s2 === "success" && assetCost != null && <Badge label={`${assetCost} cr`} color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
-        {s2 === "editorial" && <Badge label="Editorial" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
-        {(s2 === "warning" && assetError?.type === "no-package") && <Badge label="Unavailable" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
-        {s2 === "error" && <Badge label={assetError?.type === "not-found" ? "Not Found" : "Check Failed"} color="text-red-700 dark:text-red-400 bg-red-500/5 border-red-500/20"/>}
-      </div>
-
-      {/* Step 3 — Credit Check */}
-      <div className={`flex items-start justify-between gap-3 px-5 py-4 transition-colors duration-200 ${s3 === "success" ? "bg-green-500/[0.01]" : ""}`}>
-        <div className="flex items-start gap-3.5 min-w-0">
-          <Dot s={s3} />
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Credits</p>
-            {s3 === "idle" && <p className="text-xs font-semibold text-muted-foreground/40">Waiting...</p>}
-            {s3 === "success" && assetCost != null && (
-              <p className="text-sm font-extrabold text-foreground">
-                <span className="text-green-600 dark:text-green-400">{(creditBalance - assetCost).toFixed(1)} cr</span> remaining after download
-              </p>
-            )}
-            {s3 === "error" && decodlShortfall && assetCost != null && (
-              <div>
-                <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
-                  Service temporarily low on capacity
-                </p>
-                <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
-                  Please contact our support team via WhatsApp and we will download your file manually within a few minutes!
-                </p>
-                <a
-                  href="https://wa.me/94772503124"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-xs font-bold bg-[#25D366] text-white px-3.5 py-2 rounded-xl hover:opacity-90 active:scale-[0.98] transition-opacity shadow-sm shadow-[#25d366]/20"
-                >
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white shrink-0">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                  </svg>
-                  Contact Support on WhatsApp
-                </a>
-              </div>
-            )}
-            {s3 === "warning" && assetCost != null && (
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                  Requires {assetCost} cr · You have {creditBalance.toFixed(1)} cr
-                </p>
-                <Link
-                  to={routes.PricingPageRoute.to}
-                  className="inline-flex items-center gap-1 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-md shadow-primary/10"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
-                  </svg>
-                  Buy Credits
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-        {s3 === "success" && <Badge label="OK" color="text-green-700 dark:text-green-400 bg-green-500/5 border-green-500/20"/>}
-        {s3 === "warning" && <Badge label="Top Up" color="text-amber-700 dark:text-amber-400 bg-amber-500/5 border-amber-500/20"/>}
-      </div>
-
-    </div>
- );
- })()}
+  })()}
 
  {/* Dynamic Format Selector — visual cards with per-format credit cost */}
  {detectedSlug && liveInfo?.options && liveInfo.options.length > 0 && (
@@ -1320,113 +1433,6 @@ export default function DashboardPage() {
  </CardContent>
  </Card>
 
- {/* 🛠️ Developer Sandbox Tool — admin only */}
- {(user as any)?.isAdmin && (
- <Card className= "border-border shadow-md p-6 mb-8 bg-card"variant= "bento">
- <CardHeader className= "p-0">
- <button
- type= "button"
- onClick={() => setSandboxOpen((v) => !v)}
- className= "flex items-center justify-between w-full text-left"
- >
- <CardTitle className= "text-lg font-bold flex items-center gap-2">
- <span className= "text-primary">🛠️</span> Developer Sandbox Tool
- </CardTitle>
- <svg
- className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${sandboxOpen ?"rotate-180": ""}`}
- fill= "none"stroke= "currentColor"viewBox= "0 0 24 24"
- >
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M19 9l-7 7-7-7"/>
- </svg>
- </button>
- {!sandboxOpen && (
- <CardDescription className= "text-xs mt-1">
- Test your integration using free sandbox test codes with LoremPicsum.
- </CardDescription>
- )}
- </CardHeader>
- {sandboxOpen && (
- <CardContent className= "p-0 mt-4">
- <div className= "space-y-4">
- <p className= "text-[11px] text-muted-foreground leading-normal">
- To test different response states without active packages, click a test code below to auto-load it with the <strong>LoremPicsum</strong> provider:
- </p>
- <div className= "space-y-2.5">
- {[
- {
- code: "1080319028",
- label: "Simulate Success",
- desc: "Ends in 6,7,8,9 — Completes download successfully",
- badge: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
- },
- {
- code: "1080319021",
- label: "Simulate 'No Package'",
- desc: "Ends in 1 — Returns no-package error (Code 400015)",
- badge: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
- },
- {
- code: "1080319022",
- label: "Simulate 'Not Found'",
- desc: "Ends in 2 — Returns asset not found error (Code 404022)",
- badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
- },
- {
- code: "1080319023",
- label: "Simulate 'Not Supported'",
- desc: "Ends in 3 — Returns provider not supported error (Code 400011)",
- badge: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
- },
- {
- code: "1080319024",
- label: "Simulate 'Timeout'",
- desc: "Ends in 4 or 5 — Triggers API processing timeout simulation",
- badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
- },
- ].map((item, idx) => (
- <div
- key={idx}
- className= "flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border/80 bg-background/25 hover:bg-background/50 transition-colors gap-3"
- >
- <div className= "flex items-start sm:items-center gap-3">
- <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border shrink-0 ${item.badge}`}>
- {item.label}
- </span>
- <div>
- <p className= "text-xs font-semibold text-foreground">Code: <span className= "font-mono text-primary font-bold">{item.code}</span></p>
- <p className= "text-[11px] text-muted-foreground mt-0.5">
- {item.desc}
- </p>
- </div>
- </div>
- <Button
- type= "button"
- onClick={() => {
- setUrl(item.code);
- setManuallySelectedProvider("lorempicsum");
- setSelectedVariant("normal");
- toast({
- title: "Free Sandbox Loaded!",
- description: `Code ${item.code} loaded with LoremPicsum provider. Click download below to test.`,
- });
- }}
- variant= "outline"
- size= "sm"
- className= "rounded-lg h-8 px-2.5 text-xs font-bold border-border shadow-sm flex items-center gap-1.5 self-end sm:self-center bg-card hover:bg-accent"
- >
- <svg className= "w-3.5 h-3.5 text-primary"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
- </svg>
- Load Test Code
- </Button>
- </div>
- ))}
- </div>
- </div>
- </CardContent>
- )}
- </Card>
- )}
 
  {/* Recent Downloads */}
  <div ref={downloadsRef} className= "scroll-mt-24">
@@ -1441,27 +1447,79 @@ export default function DashboardPage() {
  </CardHeader>
  <CardContent className= "p-0">
  {downloadsLoading ? (
- <div className= "space-y-4">
- {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
- </div>
- ) : recentDownloads.length === 0 ? (
- <div className= "text-center py-12 border border-dashed border-border rounded-2xl bg-accent/20">
- <div className= "w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
- <svg className= "w-6 h-6 text-muted-foreground"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2} d= "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
- </svg>
- </div>
- <p className= "text-muted-foreground text-sm font-medium">No downloads yet</p>
- <p className= "text-xs text-muted-foreground mt-1 mb-4">Paste a stock URL above and download your first asset.</p>
- <a
- href= "#download-form"
- onClick={(e) => { e.preventDefault(); document.querySelector("input[type='url']")?.scrollIntoView({ behavior: "smooth", block: "center"}); (document.querySelector("input[type='url']") as HTMLElement)?.focus(); }}
- className= "inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
- >
- Download your first file →
- </a>
- </div>
- ) : (
+  <div className= "space-y-4">
+  {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
+  </div>
+  ) : recentDownloads.length === 0 ? (
+  <div className="rounded-2xl border border-border/80 bg-card p-6">
+    <div className="flex items-center gap-2 mb-6">
+      <span className="text-xl">🚀</span>
+      <div>
+        <h3 className="text-sm font-black text-foreground uppercase tracking-wider">StockMart Quick Start Guide</h3>
+        <p className="text-xs text-muted-foreground">Follow these 3 simple steps to download your first high-res file</p>
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
+      {/* Step 1 */}
+      <div className="bg-muted/30 border border-border/30 rounded-xl p-4 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px] font-extrabold">1</span>
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Copy Stock URL</h4>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Go to <strong>Freepik.com</strong>, <strong>Shutterstock.com</strong>, or other supported sites and copy the browser address bar link (URL).
+          </p>
+        </div>
+      </div>
+      
+      {/* Step 2 */}
+      <div className="bg-muted/30 border border-border/30 rounded-xl p-4 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px] font-extrabold">2</span>
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Paste & Verify</h4>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+            Paste it into the search box above. Watch the 3-step panel instantly recognize the site and verify details.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setUrl("https://picsum.photos/id/237/200/300");
+            setSelectedVariant("normal");
+            setDuplicateWarning(false);
+            urlInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            urlInputRef.current?.focus();
+            toast({
+              title: "💡 Free Demo Link pasted!",
+              description: "Look at the 3-step verification checklist above running in free Sandbox Mode!",
+            });
+          }}
+          className="w-full text-left inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline border-t border-border/30 pt-2 mt-1"
+        >
+          ⚡ Try Free Demo Link
+          <svg className="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      
+      {/* Step 3 */}
+      <div className="bg-muted/30 border border-border/30 rounded-xl p-4 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px] font-extrabold">3</span>
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Save File</h4>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Click <strong>"Download File"</strong>. In under 60 seconds, click the big green button to save the file directly to your computer!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+) : (
  <div className= "divide-y divide-border">
  {recentDownloads.map((download: any) => {
  const statusInfo = download.isBulk

@@ -58,3 +58,26 @@ export const seedProviderPricing = async (prisma: PrismaClient) => {
 
   console.log(`Seeded ${providers.length} provider pricing entries.`)
 }
+
+export const seedCreditPackages = async (prisma: PrismaClient) => {
+  console.log('Seeding CreditPackage table...')
+
+  const packages = [
+    { packageId: 'single',   name: 'Single',   credits: 1,    priceLKR: 200,    badge: null,            isPopular: false, sortOrder: 1, description: 'Try 1 download' },
+    { packageId: 'starter',  name: 'Starter',  credits: 10,   priceLKR: 1800,   badge: null,            isPopular: false, sortOrder: 2, description: 'Good for small projects' },
+    { packageId: 'value',    name: 'Value',     credits: 50,   priceLKR: 8500,   badge: '🔥 Best Value', isPopular: true,  sortOrder: 3, description: 'Most popular · Best value' },
+    { packageId: 'pro',      name: 'Pro',       credits: 100,  priceLKR: 16000,  badge: null,            isPopular: false, sortOrder: 4, description: 'Good for freelancers' },
+    { packageId: 'business', name: 'Business',  credits: 500,  priceLKR: 75000,  badge: '💼 Team Pick',  isPopular: false, sortOrder: 5, description: 'Good for agencies' },
+    { packageId: 'agency',   name: 'Agency',    credits: 1000, priceLKR: 140000, badge: '🚀 Best Rate',  isPopular: false, sortOrder: 6, description: 'Unlimited projects' },
+  ]
+
+  for (const pkg of packages) {
+    await prisma.creditPackage.upsert({
+      where: { packageId: pkg.packageId },
+      update: pkg,
+      create: pkg,
+    })
+  }
+
+  console.log(`Seeded ${packages.length} credit packages.`)
+}

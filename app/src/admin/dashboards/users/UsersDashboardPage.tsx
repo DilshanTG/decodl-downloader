@@ -7,6 +7,8 @@ import {
   adminSendPasswordReset,
   useQuery,
 } from "wasp/client/operations";
+// @ts-ignore — type generated after wasp build
+import { adminGrantFreeCredits } from "wasp/client/operations";
 import { type User } from "wasp/entities";
 import { type AuthUser } from "wasp/auth";
 import DefaultLayout from "../../layout/DefaultLayout";
@@ -117,6 +119,7 @@ function CreditModal({
 }
 
 const UsersAdminPage = ({ user }: { user: AuthUser }) => {
+  const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [emailFilter, setEmailFilter] = useState<string | undefined>(undefined);
   const [isAdminFilter, setIsAdminFilter] = useState<boolean | undefined>(undefined);
@@ -193,6 +196,7 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                   <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">User</th>
                   <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Credits</th>
                   <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Spent (LKR)</th>
+                  <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Free Cr.</th>
                   <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Admin</th>
                   <th className="text-left py-3.5 px-5 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Actions</th>
                 </tr>
@@ -201,13 +205,13 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                 {isLoading ? (
                   [1, 2, 3, 4, 5].map((i) => (
                     <tr key={i}>
-                      {[1, 2, 3, 4, 5].map((j) => (
+                      {[1, 2, 3, 4, 5, 6].map((j) => (
                         <td key={j} className="py-4 px-5"><div className="h-5 bg-muted rounded animate-pulse" /></td>
                       ))}
                     </tr>
                   ))
                 ) : !data?.users?.length ? (
-                  <tr><td colSpan={5} className="py-16 text-center text-muted-foreground text-sm font-medium">No users found.</td></tr>
+                  <tr><td colSpan={6} className="py-16 text-center text-muted-foreground text-sm font-medium">No users found.</td></tr>
                 ) : (
                   data.users.map((u) => (
                     <tr key={u.id} className="hover:bg-accent/20 transition-colors group">
@@ -220,6 +224,31 @@ const UsersAdminPage = ({ user }: { user: AuthUser }) => {
                       </td>
                       <td className="py-4 px-5">
                         <span className="text-sm font-bold text-muted-foreground tabular-nums">Rs. {((u.lifetimeSpentLKR ?? 0) / 100).toLocaleString()}</span>
+                      </td>
+                      <td className="py-4 px-5">
+                        {(u as any).freeCreditsClaimed ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            Given
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 rounded-lg text-xs font-bold px-2.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                            onClick={async () => {
+                              try {
+                                const result = await (adminGrantFreeCredits as any)({ userId: u.id });
+                                toast({ title: "2 free credits granted!", description: `New balance: ${result.newBalance.toFixed(2)} cr` });
+                                refetch();
+                              } catch (e: any) {
+                                toast({ title: "Error", description: e?.message ?? "Failed", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            Approve
+                          </Button>
+                        )}
                       </td>
                       <td className="py-4 px-5">
                         <AdminSwitch {...u} />

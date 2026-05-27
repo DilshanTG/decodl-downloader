@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
 
 const FEATURES = [
-  { text: "2 free credits on signup" },
+  { text: "2 free credits for new accounts" },
   { text: "Pay in LKR — no USD needed" },
   { text: "20+ premium providers" },
   { text: "Auto-refund if download fails" },

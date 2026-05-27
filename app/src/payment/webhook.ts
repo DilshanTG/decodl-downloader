@@ -125,7 +125,7 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
       }
 
       // Use increment (not absolute write) so concurrent credits don't overwrite each other
-      await context.entities.User.update({
+      const updatedUser = await context.entities.User.update({
         where: { id: payment.userId },
         data: {
           credits: { increment: payment.creditsAwarded },
@@ -134,12 +134,11 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
         },
       })
 
-      const newBalance = payment.user.credits + payment.creditsAwarded // approximate for display
       await context.entities.CreditTransaction.create({
         data: {
           userId: payment.userId,
           amount: payment.creditsAwarded,
-          balance: newBalance,
+          balance: updatedUser.credits,
           type: 'purchase',
           reference: payment.id,
           description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Order: ${order_id})`,

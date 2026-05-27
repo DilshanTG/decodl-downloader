@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "wasp/client/auth";
-import { createPayherePayment, getProviderPricing } from "wasp/client/operations";
+import { createPayherePayment, getProviderPricing, getCreditPackages } from "wasp/client/operations";
 import { useQuery } from "wasp/client/operations";
 import { Link, routes } from "wasp/client/router";
 import type { ProviderPricing } from "wasp/entities";
-import { CREDIT_PACKAGES } from "../shared/constants";
 import {
   Accordion,
   AccordionContent,
@@ -38,7 +37,7 @@ const FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "Yes! New accounts receive 2 free credits on signup — enough to try a download before committing.",
+    a: "Yes! New accounts receive 2 free credits after a quick admin review — usually within 24 hours. You can also buy credits right away to get started immediately.",
   },
 ];
 
@@ -93,6 +92,12 @@ export default function PricingPage() {
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
   const [confirmPackage, setConfirmPackage] = useState<string | null>(null);
   const { data: pricingData } = useQuery(getProviderPricing);
+  const { data: packagesData = [] } = useQuery(getCreditPackages);
+
+  // Compute base rate (highest per-credit price = Single) for savings display
+  const baseRate = packagesData.length > 0
+    ? Math.max(...packagesData.map((p: any) => Math.round(p.priceLKR / p.credits)))
+    : 200;
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
 
@@ -194,7 +199,7 @@ export default function PricingPage() {
               <Link to={routes.SignupRoute.to} className="text-primary hover:underline font-bold">
                 Create a free account
               </Link>{" "}
-              and get <strong className="text-foreground">2 bonus credits</strong> — no credit card required.
+              and get <strong className="text-foreground">2 welcome credits</strong> after account approval.
             </p>
           )}
         </div>
@@ -235,16 +240,20 @@ export default function PricingPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {CREDIT_PACKAGES.map((pkg) => {
-              const isPopular = "popular" in pkg && pkg.popular;
-              const badge = "badge" in pkg ? pkg.badge : null;
-              const isLoading = loadingPackage === pkg.id;
-              const isConfirming = confirmPackage === pkg.id;
-              const savings = "savings" in pkg ? pkg.savings : null;
+            {packagesData.length === 0 && (
+              <div className="col-span-3 text-center py-12 text-muted-foreground text-sm">Loading packages...</div>
+            )}
+            {packagesData.map((pkg: any) => {
+              const isPopular = pkg.isPopular;
+              const badge = pkg.badge || null;
+              const isLoading = loadingPackage === pkg.packageId;
+              const isConfirming = confirmPackage === pkg.packageId;
+              const savings = Math.round(baseRate * pkg.credits - pkg.priceLKR);
+              const perCredit = Math.round(pkg.priceLKR / pkg.credits);
               const totalWithFee = Math.round(pkg.priceLKR * 1.03);
 
               return (
-                <div key={pkg.id} className="relative flex flex-col pt-5">
+                <div key={pkg.packageId} className="relative flex flex-col pt-5">
                   {badge && (
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
                       <span className="bg-gradient-to-r from-primary to-secondary text-primary-foreground text-[10px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg ring-2 ring-background uppercase tracking-wider">
@@ -269,14 +278,7 @@ export default function PricingPage() {
                       {pkg.name}
                     </span>
                     <p className="text-xs text-muted-foreground/80 mt-1 font-semibold">
-                      {{
-                        single: "Try 1 download",
-                        starter: "Good for small projects",
-                        value: "Most popular · Best value",
-                        pro: "Good for freelancers",
-                        business: "Good for agencies",
-                        agency: "Unlimited projects",
-                      }[pkg.id] ?? ""}
+                      {pkg.description ?? ""}
                     </p>
                     <div className="my-3">
                       <span className="text-4xl sm:text-5xl font-black font-heading tracking-tight text-foreground">
@@ -301,9 +303,9 @@ export default function PricingPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <span>Rs. {pkg.perCredit}/credit</span>
+                        <span>Rs. {perCredit}/credit</span>
                       </li>
-                      {savings ? (
+                      {savings > 0 ? (
                         <li className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
                           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
@@ -364,7 +366,7 @@ export default function PricingPage() {
                             Cancel
                           </button>
                           <button
-                            onClick={() => handleBuy(pkg.id)}
+                            onClick={() => handleBuy(pkg.packageId)}
                             className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95 active:scale-[0.98] transition-all duration-150 shadow-md shadow-primary/10"
                           >
                             Confirm & Pay
@@ -373,7 +375,7 @@ export default function PricingPage() {
                       </div>
                     ) : (
                       <Button
-                        onClick={() => handleBuy(pkg.id)}
+                        onClick={() => handleBuy(pkg.packageId)}
                         disabled={isLoading}
                         variant={isPopular ? "default" : "outline"}
                         className="w-full py-6 rounded-2xl font-bold text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg duration-200"

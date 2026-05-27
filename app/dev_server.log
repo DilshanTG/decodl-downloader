@@ -1,0 +1,213 @@
+[33m
+🐝 --- Starting compilation and setup phase. Hold tight... ------------------------
+[0m
+[33m
+🐝 --- Compiling wasp project... --------------------------------------------------
+[0m
+[33m
+✅ --- Successfully completed npm install. ----------------------------------------
+[0m
+[33m
+🐝 --- Setting up database... -----------------------------------------------------
+[0m
+[33m
+✅ --- Database successfully set up. ----------------------------------------------
+[0m
+[33m
+🐝 --- Building SDK... ------------------------------------------------------------
+[0m
+
+[33m[[0m  [33mWasp[0m  [33m][0m > wasp@1.0.0 build
+[33m[[0m  [33mWasp[0m  [33m][0m > tsc && node ./scripts/copy-assets.js
+[33m[[0m  [33mWasp[0m  [33m][0m 
+[33m[[0m  [33mWasp[0m  [33m][0m [copy-assets] 0 copied, 9 skipped[33m
+✅ --- SDK built successfully. ----------------------------------------------------
+[0m
+[33m
+✅ --- Your wasp project has successfully compiled. -------------------------------
+[0m
+[33m
+🐝 --- Listening for file changes... ----------------------------------------------
+[0m
+[33m
+🐝 --- Starting up generated project... -------------------------------------------
+[0m
+
+[35m[[0m [35mServer[0m [35m][0m > @wasp.sh/generated-server@0.0.0 watch
+[35m[[0m [35mServer[0m [35m][0m > nodemon --exec 'npm run bundle-and-start || exit 1'
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m [33m[nodemon] 2.0.22[39m
+[35m[[0m [35mServer[0m [35m][0m [33m[nodemon] to restart at any time, enter `rs`[39m
+[35m[[0m [35mServer[0m [35m][0m [33m[nodemon] watching path(s): src/**/* ../../../src/**/* .env[39m
+[35m[[0m [35mServer[0m [35m][0m [33m[nodemon] watching extensions: ts,mts,js,mjs,json[39m
+[35m[[0m [35mServer[0m [35m][0m [32m[nodemon] starting `npm run bundle-and-start || exit 1`[39m
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m > @wasp.sh/generated-server@0.0.0 bundle-and-start
+[35m[[0m [35mServer[0m [35m][0m > npm run bundle && npm run start
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m > @wasp.sh/generated-server@0.0.0 bundle
+[35m[[0m [35mServer[0m [35m][0m > tsc --build && rollup --config --silent
+[35m[[0m [35mServer[0m [35m][0m 
+[36m[[0m [36mClient[0m [36m][0m   VITE v7.3.3  ready in 276 ms
+[36m[[0m [36mClient[0m [36m][0m 
+[36m[[0m [36mClient[0m [36m][0m   ➜  Local:   http://localhost:3000/
+[36m[[0m [36mClient[0m [36m][0m   ➜  Network: http://192.168.8.142:3000/
+[36m[[0m [36mClient[0m [36m][0m [vite] connected.
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m Invalid DOM property `http-equiv`. Did you mean `httpEquiv`?
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m > @wasp.sh/generated-server@0.0.0 start
+[35m[[0m [35mServer[0m [35m][0m > node --enable-source-maps -r dotenv/config bundle/server.js
+[35m[[0m [35mServer[0m [35m][0m 
+[35m[[0m [35mServer[0m [35m][0m 🚀 "Email and password" auth initialized
+[35m[[0m [35mServer[0m [35m][0m Starting pg-boss...
+[35m[[0m [35mServer[0m [35m][0m pg-boss started!
+[35m[[0m [35mServer[0m [35m][0m Server listening on port 3001
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [32m200[0m 7.191 ms - 13[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 0.337 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /auth/email/login [33m401[0m 906.197 ms - 43[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 2.092 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /auth/email/login [32m200[0m 3015.885 ms - 56[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [32m200[0m 2838.091 ms - 503[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 2773.309 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 4188.765 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 4691.454 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-provider-pricing [32m200[0m 5021.158 ms - 16234[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 6071.261 ms - 14823[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 2689.982 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [Decodl] Success via https://decodl.ir (HTTP 404)
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-decodl-balance [32m200[0m 11825.125 ms - 41[0m
+[35m[[0m [35mServer[0m [35m][0m [Decodl] Success via https://decodl.ir (HTTP 201)
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-asset-info [32m200[0m 8370.314 ms - 81[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 3129.502 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-download-by-id [32m200[0m 3654.259 ms - 704[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 4000.624 ms - 14823[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 2700.034 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3564.193 ms - 14823[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 4372.927 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [Decodl] Success via https://decodl.ir (HTTP 201)
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-asset-info [32m200[0m 7147.165 ms - 81[0m
+[35m[[0m [35mServer[0m [35m][0m [Decodl] Success via https://decodl.ir (HTTP 201)
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/submit-download [32m200[0m 8496.649 ms - 579[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [32m200[0m 2943.691 ms - 503[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-provider-pricing [32m200[0m 2948.069 ms - 16234[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3827.683 ms - 14674[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3831.944 ms - 14674[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 4507.460 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 4712.949 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3752.562 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3759.193 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 3766.480 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [Poll] Checking 1 processing downloads...
+[35m[[0m [35mServer[0m [35m][0m [Poll] Finished in 1.9s
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 3614.276 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 5516.243 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 5216.788 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 6360.068 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 5317.351 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 5881.610 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 4813.734 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-credit-balance [32m200[0m 5802.694 ms - 62[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 5329.333 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 4332.048 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 3413.227 ms - -[0m
+[35m[[0m [35mServer[0m [35m][0m [Decodl] Success via https://decodl.ir (HTTP 404)
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-decodl-balance [32m200[0m 4783.593 ms - 41[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-download-by-id [32m200[0m 4151.658 ms - 662[0m
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [32m200[0m 4390.652 ms - 14769[0m
+[35m[[0m [35mServer[0m [35m][0m [0mGET /auth/me [36m304[0m 2841.408 ms - -[0m
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] changed tsconfig file detected: /Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/server/tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.
+[36m[[0m [36mClient[0m [36m][0m [vite] program reload
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/core/serialization/custom-register.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx, /.wasp/out/sdk/wasp/dist/client/app/components/WaspApp.jsx, /src/downloads/DetailPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/core/serialization/index.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx, /.wasp/out/sdk/wasp/dist/client/app/components/WaspApp.jsx, /src/downloads/DetailPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/core/serialization/prisma.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/core/serialization/prisma.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/core/storage.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/common/LoginSignupForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ForgotPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ResetPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/VerifyEmailForm.jsx, /.wasp/out/sdk/wasp/dist/client/app/components/WaspApp.jsx, /src/downloads/DetailPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/universal/predicates.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/universal/ansiColors.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/common/LoginSignupForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ForgotPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ResetPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/VerifyEmailForm.jsx, /.wasp/out/sdk/wasp/dist/client/app/components/WaspApp.jsx, /src/downloads/DetailPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/universal/url.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/common/LoginSignupForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ForgotPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ResetPasswordForm.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/VerifyEmailForm.jsx, /.wasp/out/sdk/wasp/dist/client/app/components/WaspApp.jsx, /src/downloads/DetailPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/Auth.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/auth/forms/Auth.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/types.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/Login.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/VerifyEmail.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/ResetPassword.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/Signup.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/ForgotPassword.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/ResetPassword.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/ResetPassword.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/Signup.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/Signup.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/VerifyEmail.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/VerifyEmail.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/util.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/Form.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/Auth.jsx, /.wasp/out/sdk/wasp/dist/auth/forms/internal/Message.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Message.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Message.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/auth-styles.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/auth/forms/internal/auth-styles.css?direct, /.wasp/out/sdk/wasp/dist/auth/forms/internal/auth-styles.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Form.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/Form.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Message.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/Message.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/common/LoginSignupForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/common/LoginSignupForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Form.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/Form.module.css
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/email/ResetPasswordForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ResetPasswordForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/email/useEmail.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/email/useEmail.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/email/ForgotPasswordForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/ForgotPasswordForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/internal/email/VerifyEmailForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/internal/email/VerifyEmailForm.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/ForgotPassword.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/ForgotPassword.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/Login.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/Login.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/forms/Auth.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /.wasp/out/sdk/wasp/dist/auth/forms/Auth.jsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/useAuth.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/user.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) page reload .wasp/out/sdk/wasp/dist/auth/user.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (ssr) page reload .wasp/out/sdk/wasp/dist/auth/logout.js
+[36m[[0m [36mClient[0m [36m][0m 9:47:02 PM [vite] (client) hmr update /src/client/App.tsx, /src/client/components/NavBar/NavBar.tsx, /@wasp/client-entry.tsx, /src/user/UserDropdown.tsx, /src/user/UserMenuItems.tsx, /src/auth/LoginPage.tsx, /src/dashboard/DashboardPage.tsx
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m 9:47:02 PM [vite] (client) Pre-transform error: Failed to load url /.wasp/out/sdk/wasp/dist/client/app/layout.jsx (resolved id: /Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/app/layout.jsx) in /Users/dilshantg/Documents/Development/digistock/stockgrab/app/client-entry.tsx. Does the file exist?
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m 9:47:02 PM [vite] (client) Pre-transform error: Failed to load url /.wasp/out/sdk/wasp/dist/client/app/index.jsx (resolved id: /Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/app/index.jsx) in /Users/dilshantg/Documents/Development/digistock/stockgrab/app/client-entry.tsx. Does the file exist?
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m node:internal/process/promises:394
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     triggerUncaughtException(err, true /* fromPromise */);
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     ^
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m 
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m Error: ENOENT: no such file or directory, open '/Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/vite/virtual-files/files/ssr-entry.tsx'
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at Object.readFileSync (node:fs:440:20)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at getFileContentFromRelativePath (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/vite/virtual-files/index.js:12:15)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at getSsrEntryTsxContent (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/vite/virtual-files/index.js:9:12)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at LoadPluginContext.load (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/vite/plugins/virtualModules.js:19:28)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at EnvironmentPluginContainer.load (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:28779:56)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at loadAndTransform (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:22644:43)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at doTransform (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:22613:17)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at async fetchModule (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:34013:15)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at async handleInvoke (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:25853:21)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m     at async EventEmitter.listenerForInvokeHandler (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/chunks/config.js:25908:13) {
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m   errno: -2,
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m   code: 'ENOENT',
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m   syscall: 'open',
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m   path: '/Users/dilshantg/Documents/Development/digistock/stockgrab/app/.wasp/out/sdk/wasp/dist/client/vite/virtual-files/files/ssr-entry.tsx',
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m   runnerError: Error: RunnerError
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at reviveInvokeError (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/module-runner.js:476:64)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at Object.invoke (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/module-runner.js:549:11)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at async ModuleRunner.getModuleInformation (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/module-runner.js:1086:7)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at async ModuleRunner.import (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/vite/dist/node/module-runner.js:1013:23)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at async file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/@wasp.sh/lib-vite-ssr/dist/index.mjs:160:41
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at async withRegisteredCss (file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/@wasp.sh/lib-vite-ssr/dist/index.mjs:130:16)
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m       at async file:///Users/dilshantg/Documents/Development/digistock/stockgrab/app/node_modules/@wasp.sh/lib-vite-ssr/dist/index.mjs:159:19
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m }
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m 
+[36m[[0m [36mClient[0m[1m[31m![0m[36m][0m Node.js v24.14.0
+[35m[[0m [35mServer[0m [35m][0m [0mPOST /operations/get-my-downloads [0m-[0m - ms - -[0m

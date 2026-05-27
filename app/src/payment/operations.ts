@@ -1,20 +1,29 @@
-import { type CreatePayherePayment } from 'wasp/server/operations'
+import { type CreatePayherePayment, type GetCreditPackages } from 'wasp/server/operations'
 import { HttpError } from 'wasp/server'
 
 const DIGIMART_BASE = 'https://pay.digimartsolutions.lk'
 
-const PACKAGES = {
-  single:   { credits: 1,    amountLKR: 200,    name: 'Single'   },
-  starter:  { credits: 10,   amountLKR: 1800,   name: 'Starter'  },
-  value:    { credits: 50,   amountLKR: 8500,   name: 'Value'    },
-  pro:      { credits: 100,  amountLKR: 16000,  name: 'Pro'      },
-  business: { credits: 500,  amountLKR: 75000,  name: 'Business' },
-  agency:   { credits: 1000, amountLKR: 140000, name: 'Agency'   },
-} as const
+// ─── Public query: pricing page (no auth required) ────────────────────────────
+let packagesCache: { data: any[] | null; at: number } = { data: null, at: 0 }
+const PACKAGES_CACHE_TTL_MS = 5 * 60 * 1000
 
-type PackageId = keyof typeof PACKAGES
+export const getCreditPackages: GetCreditPackages<void, any[]> = async (_args, context) => {
+  if (packagesCache.data !== null && Date.now() - packagesCache.at < PACKAGES_CACHE_TTL_MS) {
+    return packagesCache.data
+  }
+  const data = await context.entities.CreditPackage.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  })
+  packagesCache = { data, at: Date.now() }
+  return data
+}
 
-type CreatePayherePaymentInput  = { packageId: PackageId }
+export function invalidatePackagesCache() {
+  packagesCache = { data: null, at: 0 }
+}
+
+type CreatePayherePaymentInput  = { packageId: string }
 type CreatePayherePaymentOutput = { paymentUrl: string }
 
 export const createPayherePayment: CreatePayherePayment<
@@ -23,8 +32,10 @@ export const createPayherePayment: CreatePayherePayment<
 > = async ({ packageId }, context) => {
   if (!context.user) throw new HttpError(401)
 
-  const pkg = PACKAGES[packageId]
-  if (!pkg) throw new HttpError(400, 'Invalid package')
+  const pkg = await context.entities.CreditPackage.findFirst({
+    where: { packageId, isActive: true },
+  })
+  if (!pkg) throw new HttpError(400, 'Invalid or inactive package')
 
   // Dedup: prevent double payment from rapid re-clicks (5-min window per user+package)
   const recentPending = await context.entities.Payment.findFirst({
@@ -42,7 +53,7 @@ export const createPayherePayment: CreatePayherePayment<
 
   // Add 3% card payment processing fee
   const CARD_FEE_RATE = 0.03
-  const finalAmount = Math.round(pkg.amountLKR * (1 + CARD_FEE_RATE))
+  const finalAmount = Math.round(pkg.priceLKR * (1 + CARD_FEE_RATE))
 
   const customerName = (context.user as any).username || context.user.email?.split('@')[0] || 'Customer'
 
@@ -64,7 +75,7 @@ export const createPayherePayment: CreatePayherePayment<
       customer_email: context.user.email ?? '',
       first_name: customerName,
       last_name: 'LK',
-      description: `StockMart.lk - ${pkg.name} (${pkg.credits} Credits)`,
+      description: `StockMart.lk - ${pkg.name} (${pkg.credits} Credit${pkg.credits === 1 ? '' : 's'})`,
     }),
   })
 
@@ -100,7 +111,7 @@ export const createPayherePayment: CreatePayherePayment<
     },
   })
 
-  console.log(`Payment initiated: ${order_id} (${pkg.name}, Rs. ${finalAmount} incl. 3% fee) for user ${context.user.id}`)
+  console.log(`[Payment] Initiated ${order_id} — ${pkg.name} (${pkg.credits} cr, Rs. ${finalAmount} incl. 3% fee) for user ${context.user.id}`)
 
   return { paymentUrl: payment_url }
 }

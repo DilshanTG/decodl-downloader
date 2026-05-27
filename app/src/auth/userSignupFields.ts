@@ -8,6 +8,8 @@ function isAdminEmail(email: string): boolean {
 
 const emailDataSchema = z.object({
   email: z.string(),
+  name: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 export const getEmailUserFields = defineUserSignupFields({
@@ -22,6 +24,16 @@ export const getEmailUserFields = defineUserSignupFields({
   isAdmin: (data) => {
     const emailData = emailDataSchema.parse(data);
     return isAdminEmail(emailData.email);
+  },
+  // @ts-ignore — name/phone exist after wasp regenerates types from schema.prisma
+  name: (data: any) => {
+    const emailData = emailDataSchema.parse(data);
+    return emailData.name ?? null;
+  },
+  // @ts-ignore — name/phone exist after wasp regenerates types from schema.prisma
+  phone: (data: any) => {
+    const emailData = emailDataSchema.parse(data);
+    return emailData.phone ?? null;
   },
 });
 

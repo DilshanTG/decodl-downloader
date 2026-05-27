@@ -76,7 +76,14 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
 
   // 1. Detect provider
   let resolvedSlug = providerSlug
-  if (!resolvedSlug && link) resolvedSlug = detectProviderFromUrl(link) || undefined
+  if (link) {
+    const detectedSlug = detectProviderFromUrl(link)
+    if (!detectedSlug) throw new HttpError(400, 'Could not detect a supported provider from the provided URL.')
+    if (providerSlug && detectedSlug !== providerSlug) {
+      throw new HttpError(400, 'Security warning: Selected provider does not match the provider detected from the URL.')
+    }
+    resolvedSlug = detectedSlug
+  }
   if (!resolvedSlug) throw new HttpError(400, 'Could not detect provider. Please paste a valid URL.')
 
   // 2. Look up credit cost from DB (not the 5-min cache — pricing is used for billing, must be fresh)
@@ -282,7 +289,14 @@ export const getAssetInfo: GetAssetInfo<GetAssetInfoInput, any> = async (
   assetInfoCalls.set(key, [...recent, now])
 
   let resolvedSlug = providerSlug
-  if (!resolvedSlug && link) resolvedSlug = detectProviderFromUrl(link) || undefined
+  if (link) {
+    const detectedSlug = detectProviderFromUrl(link)
+    if (!detectedSlug) throw new HttpError(400, 'Could not detect a supported provider from the provided URL.')
+    if (providerSlug && detectedSlug !== providerSlug) {
+      throw new HttpError(400, 'Security warning: Selected provider does not match the provider detected from the URL.')
+    }
+    resolvedSlug = detectedSlug
+  }
   if (!resolvedSlug) throw new HttpError(400, 'Could not detect provider. Please paste a valid URL.')
 
   try {

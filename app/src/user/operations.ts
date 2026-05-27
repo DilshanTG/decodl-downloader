@@ -117,6 +117,7 @@ export const getPaginatedUsers: GetPaginatedUsers<
       isAdmin: true,
       credits: true,
       lifetimeSpentLKR: true,
+      freeCreditsClaimed: true,
     },
     orderBy: {
       username: "asc",

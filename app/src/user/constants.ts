@@ -1,28 +1,7 @@
-import { History, LayoutDashboard, Settings, Shield, Coins } from "lucide-react";
+import { Settings, Shield } from "lucide-react";
 import { routes } from "wasp/client/router";
 
 export const userMenuItems = [
-  {
-    name: "Dashboard",
-    to: routes.DashboardRoute.to,
-    icon: LayoutDashboard,
-    isAdminOnly: false,
-    isAuthRequired: true,
-  },
-  {
-    name: "Downloads",
-    to: routes.DownloadHistoryRoute.to,
-    icon: History,
-    isAdminOnly: false,
-    isAuthRequired: true,
-  },
-  {
-    name: "Credits",
-    to: routes.CreditsRoute.to,
-    icon: Coins,
-    isAdminOnly: false,
-    isAuthRequired: true,
-  },
   {
     name: "Account Settings",
     to: routes.AccountRoute.to,

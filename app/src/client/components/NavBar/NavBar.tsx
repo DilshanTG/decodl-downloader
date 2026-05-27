@@ -1,9 +1,9 @@
 import { LogIn, Menu } from "lucide-react";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState, useRef } from "react";
 import { Link as ReactRouterLink, NavLink } from "react-router";
 import { useAuth } from "wasp/client/auth";
 import { useQuery } from "wasp/client/operations";
-import { getMyCreditBalance } from "wasp/client/operations";
+import { getMyCreditBalance, getMyDownloads } from "wasp/client/operations";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
 import {
   Sheet,
@@ -20,6 +20,173 @@ import { useIsLandingPage } from "../../hooks/useIsLandingPage";
 import { cn } from "../../utils";
 import DarkModeSwitcher from "../DarkModeSwitcher";
 import { Announcement } from "./Announcement";
+
+const TERMINAL_STATUSES = new Set(["completed", "failed", "refunded"]);
+
+// Reuse single AudioContext — creating one per call leaks memory
+let _audioCtx: AudioContext | null = null;
+function getAudioCtx() {
+  if (!_audioCtx || _audioCtx.state === "closed") _audioCtx = new AudioContext();
+  return _audioCtx;
+}
+
+// Play a pleasant two-tone chime using Web Audio API — no external files needed
+function playChime() {
+  try {
+    const ctx = getAudioCtx();
+    const times = [0, 0.18];
+    const freqs = [1046.5, 1318.5]; // C6, E6
+    times.forEach((t, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freqs[i];
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.6);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.6);
+    });
+  } catch {}
+}
+
+// Show browser notification — only if user has already granted permission (never auto-request)
+async function showNotification(title: string, body: string) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  new Notification(title, {
+    body,
+    icon: "/stockmart-logo.svg",
+    badge: "/stockmart-logo.svg",
+    silent: true,
+  });
+}
+
+function NavBarNotificationBell() {
+  const { data: user } = useAuth();
+  const [pollInterval, setPollInterval] = useState<number | false>(2000);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string; type: "success" | "error"; title: string; body: string; read: boolean; ts: number;
+  }>>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const prevStatusesRef = useRef<Record<string, string>>({});
+
+  const { data: downloadsData } = useQuery(
+    getMyDownloads,
+    { page: 1 },
+    { refetchInterval: pollInterval, staleTime: 5000, enabled: !!user }
+  );
+
+  useEffect(() => {
+    if (!downloadsData?.downloads?.length) {
+      setPollInterval(false);
+      return;
+    }
+    const hasActive = downloadsData.downloads
+      .slice(0, 10)
+      .some((d: any) => !TERMINAL_STATUSES.has(d.status));
+    setPollInterval(hasActive ? 2000 : false);
+  }, [downloadsData]);
+
+  useEffect(() => {
+    const downloads = downloadsData?.downloads ?? [];
+    if (downloads.length === 0) return;
+
+    const prev = prevStatusesRef.current;
+    const newNotifs: typeof notifications = [];
+
+    downloads.forEach((d: any) => {
+      const wasActive = prev[d.id] && !TERMINAL_STATUSES.has(prev[d.id]);
+      if (wasActive && d.status === "completed") {
+        playChime();
+        showNotification("✅ Download Ready!", `${d.providerSlug} — your file is ready.`);
+        newNotifs.push({
+          id: `${d.id}-done`,
+          type: "success",
+          title: "Download Ready!",
+          body: `${d.providerSlug} — click to download.`,
+          read: false,
+          ts: Date.now(),
+        });
+      }
+      if (wasActive && d.status === "failed") {
+        showNotification("❌ Download Failed", `${d.providerSlug} — credits refunded.`);
+        newNotifs.push({
+          id: `${d.id}-fail`,
+          type: "error",
+          title: "Download Failed",
+          body: `${d.providerSlug} — credits refunded automatically.`,
+          read: false,
+          ts: Date.now(),
+        });
+      }
+    });
+
+    if (newNotifs.length > 0) {
+      setNotifications(prev => [...newNotifs, ...prev].slice(0, 20));
+    }
+
+    const next: Record<string, string> = {};
+    downloads.forEach((d: any) => { next[d.id] = d.status; });
+    prevStatusesRef.current = next;
+  }, [downloadsData]);
+
+  if (!user) return null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => { setNotifOpen(o => !o); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
+        className="relative p-2 rounded-xl hover:bg-white/10 transition-colors"
+        aria-label="Notifications"
+      >
+        <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-secondary text-[10px] font-black text-white flex items-center justify-center duration-200">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Dropdown */}
+      {notifOpen && (
+        <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl shadow-black/20 z-50 overflow-hidden duration-200">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="text-sm font-bold text-foreground">Notifications</span>
+            {notifications.length > 0 && (
+              <button onClick={() => setNotifications([])} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">No new notifications</div>
+            ) : (
+              notifications.map(n => (
+                <div key={n.id} className="flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-0">
+                  <span className="text-base mt-0.5 shrink-0">{n.type === "success" ? "✅" : "❌"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground leading-snug">{n.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-normal">{n.body}</p>
+                    <p className="text-[9px] text-muted-foreground/60 mt-1">
+                      {new Date(n.ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface NavigationItem {
   name: string;
@@ -130,6 +297,7 @@ function NavBarDesktopUserDropdown() {
       ) : (
         <div className="ml-3 flex items-center gap-3">
           <NavBarCreditSection />
+          <NavBarNotificationBell />
           <UserDropdown user={user} />
         </div>
       )}
