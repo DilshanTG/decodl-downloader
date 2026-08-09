@@ -1,3 +1,5 @@
+import { log } from '../server/logger'
+
 // All known Decodl domains — tried in order, fallback on network/gateway failure.
 // decodl.net geo-blocks some regions (returns 403 HTML), so it goes last.
 const DECODL_DOMAINS = [
@@ -5,6 +7,11 @@ const DECODL_DOMAINS = [
   'https://decodlbot.ir',
   'https://decodl.net',
 ]
+
+const DEFAULT_TIMEOUT_MS = 15_000
+
+/** Known Decodl numeric error codes: 4xxxxx / 5xxxxx (e.g. 400015, 404024). */
+const KNOWN_ERROR_CODE_RE = /^[45]\d{5}$/
 
 function getHeaders() {
   return {
@@ -23,6 +30,28 @@ function filterOptions(options?: Array<{ name: string; value: string }>) {
   return filtered.length > 0 ? filtered : undefined
 }
 
+function markTransient(err: Error, extra?: Record<string, unknown>): Error {
+  return Object.assign(err, { transient: true as const, ...extra })
+}
+
+/**
+ * True when the error is safe/expected for PgBoss retry (outage, timeout, 429, missing jobId).
+ * Hard 4xx application rejections do NOT set transient.
+ */
+export function isTransientDecodlError(err: unknown): boolean {
+  return !!(err && typeof err === 'object' && (err as { transient?: boolean }).transient === true)
+}
+
+function mergeSignals(existing: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs)
+  if (!existing) return timeout
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([existing, timeout])
+  }
+  // Fallback: prefer the per-attempt timeout
+  return timeout
+}
+
 // Tries path (relative to domain) on each domain in order.
 // Falls back to the next domain on infrastructure failures.
 // Throws the last infrastructure error if all domains fail.
@@ -30,6 +59,7 @@ function filterOptions(options?: Array<{ name: string; value: string }>) {
 async function fetchWithFallback(
   pathFn: (domain: string) => string,
   init: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<{ response: Response; data: any }> {
   let lastError: any = null
 
@@ -38,13 +68,45 @@ async function fetchWithFallback(
     let response: Response
     let data: any
 
+    const attemptInit: RequestInit = {
+      ...init,
+      signal: mergeSignals(init.signal ?? undefined, timeoutMs),
+    }
+
     try {
-      response = await fetch(url, init)
-    } catch (networkErr) {
-      // Network-level failure (DNS, ECONNREFUSED, timeout) — try next domain
-      console.warn(`[Decodl] Network error on ${domain}:`, networkErr)
-      lastError = networkErr
+      response = await fetch(url, attemptInit)
+    } catch (networkErr: any) {
+      // Network-level failure (DNS, ECONNREFUSED, AbortError/timeout) — try next domain
+      const isAbort =
+        networkErr?.name === 'AbortError' ||
+        networkErr?.name === 'TimeoutError' ||
+        /aborted|timeout/i.test(String(networkErr?.message || ''))
+      log.warn('decodl_network_error', {
+        domain,
+        kind: isAbort ? 'timeout' : 'network',
+        timeoutMs,
+        error: networkErr?.message || String(networkErr),
+      })
+      lastError = markTransient(
+        networkErr instanceof Error
+          ? networkErr
+          : new Error(String(networkErr?.message || 'Network error')),
+        { code: isAbort ? 'timeout' : 'network-error' }
+      )
       continue
+    }
+
+    // HTTP 429: account is rate-limited on all domains — do not fail over
+    if (response.status === 429) {
+      log.warn('decodl_rate_limited', { domain, status: 429 })
+      let body: any = null
+      try {
+        body = JSON.parse(await response.text())
+      } catch { /* ignore */ }
+      throw markTransient(
+        new Error(body?.message || 'Provider rate limit exceeded. Please retry shortly.'),
+        { statusCode: 429, code: 'rate-limit' }
+      )
     }
 
     try {
@@ -52,8 +114,8 @@ async function fetchWithFallback(
       data = JSON.parse(text)
     } catch {
       // Non-JSON body (HTML error page) — try next domain
-      console.warn(`[Decodl] Non-JSON response from ${domain} (HTTP ${response.status})`)
-      lastError = Object.assign(
+      log.warn('decodl_non_json', { domain, status: response.status })
+      lastError = markTransient(
         new Error(`Provider API unavailable (HTTP ${response.status}). Retrying...`),
         { statusCode: response.status, code: 'gateway-error' }
       )
@@ -62,26 +124,39 @@ async function fetchWithFallback(
 
     // 5xx from any domain means infrastructure failure — try next
     if (response.status >= 500) {
-      console.warn(`[Decodl] 5xx from ${domain} (HTTP ${response.status})`)
-      lastError = Object.assign(
+      log.warn('decodl_5xx', { domain, status: response.status })
+      lastError = markTransient(
         new Error(data?.message || `Server error (HTTP ${response.status})`),
         { statusCode: response.status, code: 'server-error' }
       )
       continue
     }
 
-    // Got a real response (2xx or 4xx) — stop here, this domain is working
-    console.log(`[Decodl] Success via ${domain} (HTTP ${response.status})`)
+    // Got a real response (2xx or hard 4xx) — stop here, this domain is working
+    log.info('decodl_ok', { domain, status: response.status })
     return { response, data }
   }
 
-  // All domains failed — surface the last error
-  throw lastError ?? new Error('All provider API endpoints are currently unreachable. Please try again in a few minutes.')
+  // All domains failed — surface the last error (always transient infrastructure failure)
+  if (lastError) {
+    if (!isTransientDecodlError(lastError)) {
+      lastError = markTransient(
+        lastError instanceof Error
+          ? lastError
+          : new Error(String(lastError?.message || lastError))
+      )
+    }
+    throw lastError
+  }
+  throw markTransient(
+    new Error('All provider API endpoints are currently unreachable. Please try again in a few minutes.'),
+    { code: 'all-domains-down' }
+  )
 }
 
 export function scrubDecodlBrand(message: string): string {
   if (!message) return message;
-  
+
   return message
     .replace(/@decodl_support/gi, '@stockmart_support')
     .replace(/decodlbot\.ir/gi, 'stockmart.lk')
@@ -135,6 +210,11 @@ function extractMagnificVideoCode(link: string): string | undefined {
   return match ? match[1] : undefined
 }
 
+function isKnownNumericErrorCode(value: unknown): boolean {
+  if (value === undefined || value === null) return false
+  return KNOWN_ERROR_CODE_RE.test(String(value))
+}
+
 export async function submitDecodlDownload(params: DecodlSubmitParams): Promise<DecodlSubmitResult> {
   const body: Record<string, any> = {}
 
@@ -171,12 +251,22 @@ export async function submitDecodlDownload(params: DecodlSubmitParams): Promise<
   const { response, data } = await fetchWithFallback(
     (domain) => `${domain}/api/product/dev`,
     { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) },
+    15_000,
   )
 
   if (!response.ok) {
+    // Hard 4xx application errors — not transient (do not PgBoss-retry forever)
     const code = data.code
     const message = data.message || 'Download request failed'
     throw Object.assign(new Error(scrubDecodlBrand(message)), { statusCode: response.status, code })
+  }
+
+  if (!data.jobId || typeof data.jobId !== 'string') {
+    log.error('decodl_missing_job_id', { payloadKeys: Object.keys(data || {}) })
+    throw markTransient(
+      new Error('Provider accepted the request but returned no job ID'),
+      { code: 'missing-job-id', statusCode: response.status }
+    )
   }
 
   return { jobId: data.jobId }
@@ -187,6 +277,7 @@ export async function checkDecodlJobStatus(jobId: string): Promise<DecodlStatusR
   const { response, data } = await fetchWithFallback(
     (domain) => `${domain}/api/job/dev/${jobId}`,
     { method: 'GET', headers: getHeaders() },
+    20_000,
   )
 
   if (response.status === 404) {
@@ -194,31 +285,61 @@ export async function checkDecodlJobStatus(jobId: string): Promise<DecodlStatusR
   }
 
   if (!response.ok) {
-    throw Object.assign(new Error(data.message || 'Status check failed'), { statusCode: response.status })
+    // 5xx already retried across domains inside fetchWithFallback; remaining failures throw
+    throw markTransient(
+      new Error(data.message || 'Status check failed'),
+      { statusCode: response.status }
+    )
   }
 
-  // 1. Handle failure and error responses
-  const errorCode = data.errorCode || data.code;
-  const rawError = data.error || (data.status === 'failed' ? data.message : null);
+  // 1. Strict failure classification — never treat bare/unrecognized `code` as failure
+  const hasErrorString = typeof data.error === 'string' && data.error.trim().length > 0
+  const hasErrorCodeField = data.errorCode !== undefined && data.errorCode !== null
+  const knownCodeFromCodeField = isKnownNumericErrorCode(data.code)
+  const isFailedStatus = data.status === 'failed'
 
-  if (rawError || errorCode || data.status === 'failed') {
-    let friendlyMessage = rawError || data.message || 'Download failed';
-    const key = (errorCode || rawError || friendlyMessage).toString().toLowerCase();
+  if (isFailedStatus || hasErrorString || hasErrorCodeField || knownCodeFromCodeField) {
+    const errorCode = hasErrorCodeField
+      ? data.errorCode
+      : (knownCodeFromCodeField ? data.code : undefined)
+    let friendlyMessage =
+      (hasErrorString ? data.error : null) ||
+      data.message ||
+      'Download failed'
+    const key = (errorCode || friendlyMessage).toString().toLowerCase()
     if (ERROR_MAPPINGS[key]) {
-      friendlyMessage = ERROR_MAPPINGS[key];
+      friendlyMessage = ERROR_MAPPINGS[key]
     }
     return {
       status: 'failed',
       errorMessage: friendlyMessage,
-      errorCode: typeof errorCode === 'number' ? errorCode : undefined,
+      errorCode: typeof errorCode === 'number' ? errorCode : (typeof errorCode === 'string' && /^\d+$/.test(errorCode) ? Number(errorCode) : undefined),
     }
   }
 
-  // 2. Handle success
-  if (data.status === 'completed' || data.downloadLink || data.downloadUrl || data.link) {
+  // Bare unrecognized `code` must NOT fail the job
+  if (data.code !== undefined && data.code !== null) {
+    log.warn('decodl_unrecognized_code', { code: data.code })
+  }
+
+  // 2. Strict completion — do NOT trigger on data.link / data.url alone (may echo submit body)
+  const isCompleted =
+    data.status === 'completed' ||
+    !!(data.downloadLink) ||
+    !!(data.downloadUrl)
+
+  if (isCompleted) {
+    // Fallbacks for URL once completion is established (link/url OK as URL source only)
+    const downloadUrl = data.downloadLink || data.downloadUrl || data.link || data.url
+    if (!downloadUrl || typeof downloadUrl !== 'string') {
+      return {
+        status: 'failed',
+        errorMessage: 'Provider reported completion without a download URL',
+      }
+    }
     return {
       status: 'completed',
-      downloadUrl: data.downloadLink || data.downloadUrl || data.link || data.url,
+      downloadUrl,
       fileName: data.fileName || data.file_name || data.name,
       fileSize: data.fileSize || data.file_size || data.size,
       thumbnailUrl: data.thumbnailUrl || data.thumbnail || data.preview,
@@ -281,6 +402,7 @@ export async function fetchDecodlBalance(): Promise<DecodlBalanceResult> {
     const { response, data } = await fetchWithFallback(
       (domain) => `${domain}/api/balance`,
       { method: 'GET', headers: getHeaders() },
+      10_000,
     )
     if (!response.ok) throw new Error('balance endpoint error')
     const balance = typeof data.balance === 'number' ? data.balance
@@ -336,12 +458,14 @@ export async function getDecodlAssetInfo(params: DecodlSubmitParams): Promise<De
   const { response, data } = await fetchWithFallback(
     (domain) => `${domain}/api/product/dev/info`,
     { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) },
+    15_000,
   )
 
   if (!response.ok) {
     const code = data.code
     const exceptionCode = data.data?.exceptionCode
     const message = scrubDecodlBrand(data.message || 'Asset info retrieval failed')
+    // Hard 4xx: not transient
     throw Object.assign(new Error(message), { statusCode: response.status, code, exceptionCode })
   }
 

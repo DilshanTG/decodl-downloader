@@ -73,6 +73,19 @@ function NavBarNotificationBell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
   const prevStatusesRef = useRef<Record<string, string>>({});
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const { data: downloadsData } = useQuery(
     getMyDownloads,
@@ -137,13 +150,13 @@ function NavBarNotificationBell() {
   if (!user) return null;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={bellRef}>
       <button
         onClick={() => { setNotifOpen(o => !o); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
-        className="relative p-2 rounded-xl hover:bg-white/10 transition-colors"
+        className="relative p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         aria-label="Notifications"
       >
-        <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unreadCount > 0 && (
@@ -155,7 +168,7 @@ function NavBarNotificationBell() {
 
       {/* Dropdown */}
       {notifOpen && (
-        <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl shadow-black/20 z-50 overflow-hidden duration-200">
+        <div className="absolute right-[-40px] sm:right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl shadow-black/20 z-50 overflow-hidden duration-200">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-sm font-bold text-foreground">Notifications</span>
             {notifications.length > 0 && (
@@ -239,10 +252,13 @@ export default function NavBar({
                 {renderNavigationItems(navigationItems)}
               </ul>
             </div>
-            <NavBarMobileMenu
-              isScrolled={isScrolled}
-              navigationItems={navigationItems}
-            />
+            <div className="flex items-center gap-2 lg:hidden">
+              <NavBarNotificationBell />
+              <NavBarMobileMenu
+                isScrolled={isScrolled}
+                navigationItems={navigationItems}
+              />
+            </div>
             <NavBarDesktopUserDropdown />
           </nav>
         </div>

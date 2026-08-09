@@ -1,5 +1,21 @@
-import { checkDecodlJobStatus, submitDecodlDownload, scrubDecodlBrand } from '../decodl/client'
+import { prisma } from 'wasp/server'
+import {
+  checkDecodlJobStatus,
+  submitDecodlDownload,
+  scrubDecodlBrand,
+  isTransientDecodlError,
+} from '../decodl/client'
 import { sendDownloadReadyEmail, sendDownloadFailedEmail } from './emails'
+import { alertCritical } from '../server/alerts'
+import { log } from '../server/logger'
+
+/** Last reconcile summary for admin System Health (in-process only). */
+export let lastReconcileSummary: {
+  at: string
+  scanned: number
+  healed: number
+  driftAlerts: number
+} | null = null
 
 // ─── Concurrency gate for Decodl submissions ──────────────────────────────────
 // PgBoss worker teamSize isn't configurable via Wasp's DSL, so we implement
@@ -49,11 +65,11 @@ export const processDecodlSubmission = async (
 
   // Guard: skip if already moved out of pending (duplicate job, race condition)
   if (!download || download.status !== 'pending') {
-    console.log(`[Submit] Download ${downloadId} is no longer pending — skipping.`)
+    log.info('submit_skip_not_pending', { downloadId, status: download?.status })
     return
   }
 
-  console.log(`[Submit] Submitting download ${downloadId} (${download.providerSlug}) to Decodl...`)
+  log.info('submit_start', { downloadId, providerSlug: download.providerSlug })
 
   try {
     const result = await withDecodlSlot(() => submitDecodlDownload({
@@ -63,8 +79,10 @@ export const processDecodlSubmission = async (
       options: (download.options as any[]) || [],
     }))
 
-    await context.entities.Download.update({
-      where: { id: downloadId },
+    // Atomic pending→processing claim. If poll/timeout already failed this download
+    // after we submitted to Decodl, do NOT resurrect it or touch credits.
+    const claimed = await context.entities.Download.updateMany({
+      where: { id: downloadId, status: 'pending' },
       data: {
         status: 'processing',
         decodlJobId: result.jobId,
@@ -73,12 +91,20 @@ export const processDecodlSubmission = async (
       },
     })
 
-    console.log(`[Submit] Download ${downloadId} → jobId ${result.jobId} (active: ${activeDecodlCalls})`)
+    if (claimed.count === 0) {
+      log.error('submit_orphaned_job', { downloadId, decodlJobId: result.jobId })
+      return
+    }
+
+    log.info('submit_claimed', { downloadId, decodlJobId: result.jobId, active: activeDecodlCalls })
 
   } catch (err: any) {
-    console.error(`[Submit] Decodl rejected download ${downloadId}:`, err.message)
-    // If it's a concurrency limit error, let PgBoss retry — don't refund yet
-    if (err.message?.includes('concurrency limit')) throw err
+    log.error('submit_rejected', { downloadId, error: err.message, transient: isTransientDecodlError(err) })
+    // Concurrency-limit and transient provider errors → PgBoss retry (download stays pending).
+    // Hard 4xx application rejections → permanent fail + reservation release.
+    if (err.message?.includes('concurrency limit') || isTransientDecodlError(err)) {
+      throw err
+    }
     await handleDownloadFailure(download, context, err.message || 'Decodl submission failed')
   }
 }
@@ -91,24 +117,44 @@ export const processDecodlSubmission = async (
 //
 // Also handles the "pending timeout" safety net: if a download has been
 // pending for >5 minutes (job never ran or PgBoss insert failed), refund it.
+// Timeouts are measured from attemptStartedAt (per-attempt clock), not createdAt.
 // ─────────────────────────────────────────────────────────────────────────────
 export const pollDecodlJobs = async (_args: unknown, context: any) => {
   const startedAt = Date.now()
 
-  // Safety net: fail any download stuck in "pending" for >5 minutes.
-  // This catches cases where processDecodlSubmission job was never enqueued.
+  // Safety net: fail any download stuck in "pending" for >5 minutes on this attempt.
   const PENDING_TIMEOUT_MS = 5 * 60 * 1000
   const stalePending = await context.entities.Download.findMany({
     where: {
       status: 'pending',
-      createdAt: { lt: new Date(Date.now() - PENDING_TIMEOUT_MS) },
+      attemptStartedAt: { lt: new Date(Date.now() - PENDING_TIMEOUT_MS) },
     },
     take: 20,
   })
 
   for (const download of stalePending) {
-    console.log(`[Poll] Pending timeout for download ${download.id} — refunding`)
+    log.warn('poll_pending_timeout', { downloadId: download.id })
     await handleDownloadFailure(download, context, 'Download submission timed out. Credits have been refunded.')
+  }
+
+  // Zombie sweep: processing + null decodlJobId is invisible to the main poll query
+  // (missing-jobId path before validation, or claim with undefined jobId historically).
+  // These never hit the 30-min timeout check — sweep them after 5 minutes.
+  const zombies = await context.entities.Download.findMany({
+    where: {
+      status: 'processing',
+      decodlJobId: null,
+      attemptStartedAt: { lt: new Date(Date.now() - PENDING_TIMEOUT_MS) },
+    },
+    take: 20,
+  })
+  for (const download of zombies) {
+    log.warn('poll_zombie_sweep', { downloadId: download.id })
+    await handleDownloadFailure(
+      download,
+      context,
+      'Download was accepted but no provider job was created. Credits have been refunded.'
+    )
   }
 
   // Main poll: check all "processing" downloads with a Decodl job ID
@@ -121,22 +167,34 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
     orderBy: { lastPolledAt: 'asc' },
   })
 
-  if (processingDownloads.length === 0 && stalePending.length === 0) return
+  if (
+    processingDownloads.length === 0 &&
+    stalePending.length === 0 &&
+    zombies.length === 0
+  ) {
+    return
+  }
 
-  console.log(`[Poll] Checking ${processingDownloads.length} processing downloads...`)
+  log.info('poll_checking', { count: processingDownloads.length })
 
-  for (const download of processingDownloads) {
+  // Bounded tick: chunks of 5 concurrent status checks, 50s deadline.
+  // lastPolledAt ASC ensures deferred rows are first next tick.
+  const TICK_DEADLINE_MS = 50_000
+  const CHUNK_SIZE = 5
+
+  const processOneDownload = async (download: any) => {
     // Respect Decodl's update interval — don't poll more than once per 25s
     if (download.lastPolledAt) {
       const secondsSincePoll = (Date.now() - download.lastPolledAt.getTime()) / 1000
-      if (secondsSincePoll < 25) continue
+      if (secondsSincePoll < 25) return
     }
 
-    // Hard timeout: 30 minutes in "processing" = something went wrong
-    const minutesProcessing = (Date.now() - download.createdAt.getTime()) / 60000
+    // Hard timeout: 30 minutes on this attempt (attemptStartedAt), not lifetime createdAt
+    const attemptStart: Date = download.attemptStartedAt ?? download.createdAt
+    const minutesProcessing = (Date.now() - attemptStart.getTime()) / 60000
     if (minutesProcessing > 30) {
       await handleDownloadFailure(download, context, 'Download timed out after 30 minutes')
-      continue
+      return
     }
 
     try {
@@ -152,7 +210,7 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
           fileSize: result.fileSize || null,
           thumbnailUrl: result.thumbnailUrl || null,
         })
-        console.log(`[Poll] Download ${download.id} completed — ${download.creditsCharged} credits confirmed.`)
+        log.info('poll_completed', { downloadId: download.id, creditsCharged: download.creditsCharged })
 
       } else if (result.status === 'failed') {
         await handleDownloadFailure(download, context, scrubDecodlBrand(result.errorMessage || 'Download failed'))
@@ -171,7 +229,7 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
         })
       }
     } catch (err: any) {
-      console.error(`[Poll] Error checking download ${download.id}:`, err.message)
+      log.error('poll_check_error', { downloadId: download.id, error: err.message })
       await context.entities.Download.update({
         where: { id: download.id },
         data: { lastPolledAt: new Date(), errorMessage: scrubDecodlBrand(err.message || '') },
@@ -179,7 +237,17 @@ export const pollDecodlJobs = async (_args: unknown, context: any) => {
     }
   }
 
-  console.log(`[Poll] Finished in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
+  for (let i = 0; i < processingDownloads.length; i += CHUNK_SIZE) {
+    if (Date.now() - startedAt > TICK_DEADLINE_MS) {
+      const deferred = processingDownloads.length - i
+      log.warn('poll_tick_deadline', { deferred })
+      break
+    }
+    const chunk = processingDownloads.slice(i, i + CHUNK_SIZE)
+    await Promise.allSettled(chunk.map((d: any) => processOneDownload(d)))
+  }
+
+  log.info('poll_finished', { elapsedSec: Number(((Date.now() - startedAt) / 1000).toFixed(1)) })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +258,149 @@ export const expireOldDownloads = async (_args: unknown, context: any) => {
     where: { status: 'completed', expiresAt: { lt: new Date() } },
     data: { downloadUrl: null },
   })
-  if (result.count > 0) console.log(`[Expire] Cleared ${result.count} expired download links.`)
+  if (result.count > 0) log.info('expire_cleared', { count: result.count })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOB 4: reconcileReservedCredits (scheduled daily at 03:00)
+//
+// Invariant: User.reservedCredits == SUM(creditsCharged) over pending|processing.
+// - ZERO active downloads + reserved != 0 + last download idle >15m → self-heal
+// - Active downloads with drift → log only (mid-flight ops; do not auto-fix)
+// ─────────────────────────────────────────────────────────────────────────────
+type DriftedUserRow = {
+  userId: string
+  reservedCredits: number
+  expectedReserved: number
+  activeDownloads: number
+}
+
+export const reconcileReservedCredits = async (_args: unknown, _context: any) => {
+  const startedAt = Date.now()
+
+  // Find users whose reservedCredits drifts from the sum of active download charges.
+  // Float tolerance 0.001. Parameterized $queryRaw only.
+  const drifted: DriftedUserRow[] = await prisma.$queryRaw`
+    SELECT
+      u."id" AS "userId",
+      u."reservedCredits" AS "reservedCredits",
+      COALESCE(a."expectedReserved", 0)::float8 AS "expectedReserved",
+      COALESCE(a."activeDownloads", 0)::int AS "activeDownloads"
+    FROM "User" u
+    LEFT JOIN (
+      SELECT
+        d."userId",
+        SUM(d."creditsCharged")::float8 AS "expectedReserved",
+        COUNT(*)::int AS "activeDownloads"
+      FROM "Download" d
+      WHERE d."status" IN ('pending', 'processing')
+      GROUP BY d."userId"
+    ) a ON a."userId" = u."id"
+    WHERE ABS(u."reservedCredits" - COALESCE(a."expectedReserved", 0)) > 0.001
+  `
+
+  let healed = 0
+  let driftAlerts = 0
+  const IDLE_MS = 15 * 60 * 1000
+
+  for (const row of drifted) {
+    const reserved = Number(row.reservedCredits)
+    const expected = Number(row.expectedReserved)
+    const active = Number(row.activeDownloads)
+
+    if (active === 0 && Math.abs(reserved) > 0.001) {
+      // Unambiguous orphan reservation — only heal if last download is idle >15 min
+      // (or user has never had a download, which is also safe to heal).
+      const latest = await prisma.download.findFirst({
+        where: { userId: row.userId },
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      })
+
+      const idleEnough =
+        !latest || Date.now() - latest.updatedAt.getTime() > IDLE_MS
+
+      if (!idleEnough) {
+        log.warn('reconcile_drift_recent_activity', {
+          userId: row.userId, reserved, expected, activeDownloads: active,
+        })
+        void alertCritical('ledger.reservation_drift', {
+          userId: row.userId, reserved, expected, activeDownloads: active, reason: 'recent_activity',
+        })
+        driftAlerts++
+        continue
+      }
+
+      // Compare-and-swap heal: only clear if reservedCredits still equals observed value
+      const healedNow = await prisma.$transaction(async (tx) => {
+        const rows = await tx.$executeRaw`
+          UPDATE "User"
+          SET "reservedCredits" = 0
+          WHERE "id" = ${row.userId}
+            AND "reservedCredits" = ${reserved}
+        `
+        if (Number(rows) === 0) return false
+
+        const user = await tx.user.findUnique({
+          where: { id: row.userId },
+          select: { credits: true, reservedCredits: true },
+        })
+        const balance = user ? user.credits - user.reservedCredits : 0
+
+        await tx.creditTransaction.create({
+          data: {
+            userId: row.userId,
+            amount: reserved,
+            balance,
+            type: 'refund',
+            description: 'Reconciliation: released orphaned reservation',
+          },
+        })
+        return true
+      })
+
+      if (healedNow) {
+        healed++
+        log.info('reconcile_healed', { userId: row.userId, released: reserved })
+      } else {
+        // Concurrent mutation — leave for tomorrow
+        log.warn('reconcile_drift_cas_miss', {
+          userId: row.userId, reserved, expected, activeDownloads: active,
+        })
+        void alertCritical('ledger.reservation_drift', {
+          userId: row.userId, reserved, expected, activeDownloads: active, reason: 'cas_miss',
+        })
+        driftAlerts++
+      }
+      continue
+    }
+
+    // Live active downloads with drift — never auto-fix
+    log.warn('reconcile_drift_active', {
+      userId: row.userId, reserved, expected, activeDownloads: active,
+    })
+    void alertCritical('ledger.reservation_drift', {
+      userId: row.userId, reserved, expected, activeDownloads: active, reason: 'active_downloads',
+    })
+    driftAlerts++
+  }
+
+  const elapsedSec = Number(((Date.now() - startedAt) / 1000).toFixed(1))
+  lastReconcileSummary = {
+    at: new Date().toISOString(),
+    scanned: drifted.length,
+    healed,
+    driftAlerts,
+  }
+  log.info('reconcile_summary', { ...lastReconcileSummary, elapsedSec })
+  if (healed > 0 || driftAlerts > 0) {
+    void alertCritical('ledger.reconcile_summary', {
+      scanned: drifted.length,
+      healed,
+      driftAlerts,
+      elapsedSec,
+    })
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -204,35 +414,84 @@ export const expireOldDownloads = async (_args: unknown, context: any) => {
 // ─────────────────────────────────────────────────────────────────────────────
 async function confirmDownloadCharge(
   download: any,
-  context: any,
+  _context: any,
   fileData: { downloadUrl: string; fileName: string | null; fileSize: number | null; thumbnailUrl: string | null }
 ) {
   const cost = download.creditsCharged
 
-  // ── Atomic idempotency guard ───────────────────────────────────────────────
-  // updateMany WHERE status='processing' atomically claims this download.
-  // If pollDecodlJobs fires twice in the same minute (scheduler overlap, restart)
-  // the second call gets count=0 and exits — no double charge ever.
-  // The status+file data write happens HERE, not in a later parallel Promise.all,
-  // so there is no window where Download is 'completed' but credits haven't moved.
-  const claimed = await context.entities.Download.updateMany({
-    where: { id: download.id, status: 'processing' },
-    data: {
-      status: 'completed',
-      downloadUrl: fileData.downloadUrl,
-      fileName: fileData.fileName,
-      fileSize: fileData.fileSize,
-      thumbnailUrl: fileData.thumbnailUrl,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      lastPolledAt: new Date(),
-    },
-  })
-  if (claimed.count === 0) return // already completed by a concurrent worker
+  // Claim + credit settlement in one transaction so a crash cannot leave
+  // download completed without credit movement (or vice versa).
+  let confirmInvariantBroken = false
+  const claimed = await prisma.$transaction(async (tx) => {
+    const claimResult = await tx.download.updateMany({
+      where: { id: download.id, status: 'processing' },
+      data: {
+        status: 'completed',
+        downloadUrl: fileData.downloadUrl,
+        fileName: fileData.fileName,
+        fileSize: fileData.fileSize,
+        thumbnailUrl: fileData.thumbnailUrl,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        lastPolledAt: new Date(),
+      },
+    })
+    if (claimResult.count === 0) return false
 
-  // Send email notification (non-blocking — never stops the download flow)
-  const userForEmail = await context.entities.User.findUnique({
+    if (cost > 0) {
+      // Guarded raw update: cannot push reservedCredits negative
+      const rows = await tx.$executeRaw`
+        UPDATE "User"
+        SET
+          "credits" = "credits" - ${cost},
+          "reservedCredits" = "reservedCredits" - ${cost},
+          "lifetimeCreditsSpent" = "lifetimeCreditsSpent" + ${cost}
+        WHERE "id" = ${download.userId}
+          AND "reservedCredits" >= ${cost}
+      `
+
+      if (Number(rows) === 0) {
+        confirmInvariantBroken = true
+        log.error('confirm_invariant_violation', {
+          downloadId: download.id,
+          userId: download.userId,
+          cost,
+        })
+      }
+
+      const user = await tx.user.findUnique({ where: { id: download.userId } })
+      const balance = user
+        ? user.credits - user.reservedCredits
+        : 0
+
+      await tx.creditTransaction.create({
+        data: {
+          userId: download.userId,
+          amount: 0, // visible balance unchanged — reservation already reduced it at submit time
+          balance,
+          type: 'download',
+          reference: download.id,
+          description: `Download confirmed — ${download.providerSlug} (${cost} credit${cost !== 1 ? 's' : ''})`,
+        },
+      })
+    }
+
+    return true
+  })
+
+  if (confirmInvariantBroken) {
+    void alertCritical('ledger.confirm_invariant', {
+      downloadId: download.id,
+      userId: download.userId,
+      cost,
+    })
+  }
+
+  if (!claimed) return // already completed by a concurrent worker
+
+  // Email OUTSIDE the transaction (non-blocking — never stops the download flow)
+  const userForEmail = await prisma.user.findUnique({
     where: { id: download.userId },
-    select: { email: true, credits: true, reservedCredits: true },
+    select: { email: true },
   })
   if (userForEmail?.email) {
     sendDownloadReadyEmail({
@@ -243,38 +502,6 @@ async function confirmDownloadCharge(
       creditsCharged: cost,
     })
   }
-
-  if (cost <= 0) return // zero-cost (admin free retry) — nothing to deduct
-
-  // ── Credit deduction ───────────────────────────────────────────────────────
-  // Use { decrement } not stale absolute values — the reservation made at submit
-  // time guarantees credits >= cost and reservedCredits >= cost here.
-  // Two concurrent calls cannot both reach this point (atomic claim above).
-  const user = await context.entities.User.findUnique({ where: { id: download.userId } })
-  if (!user) return
-
-  const approxAvailable = Math.max(0, user.credits - cost) - Math.max(0, user.reservedCredits - cost)
-
-  await Promise.all([
-    context.entities.User.update({
-      where: { id: user.id },
-      data: {
-        credits:              { decrement: cost },
-        reservedCredits:      { decrement: cost },
-        lifetimeCreditsSpent: { increment: cost },
-      },
-    }),
-    context.entities.CreditTransaction.create({
-      data: {
-        userId: user.id,
-        amount: 0, // visible balance unchanged — reservation already reduced it at submit time
-        balance: approxAvailable,
-        type: 'download',
-        reference: download.id,
-        description: `Download confirmed — ${download.providerSlug} (${cost} credit${cost !== 1 ? 's' : ''})`,
-      },
-    }),
-  ])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -285,22 +512,68 @@ async function confirmDownloadCharge(
 // Simply decrease reservedCredits back to release the hold.
 // User's credits field is untouched → guaranteed zero net impact on balance.
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleDownloadFailure(download: any, context: any, errorMessage: string) {
+async function handleDownloadFailure(download: any, _context: any, errorMessage: string) {
   const cost = download.creditsCharged
 
-  // ── Atomic idempotency guard ───────────────────────────────────────────────
-  // Covers 'pending' (called from processDecodlSubmission) and 'processing'
-  // (called from pollDecodlJobs). If the 30-min timeout AND an error response
-  // arrive in the same poll tick, only one call transitions to 'failed' —
-  // preventing reservedCredits being decremented twice (free balance exploit).
-  const claimed = await context.entities.Download.updateMany({
-    where: { id: download.id, status: { notIn: ['completed', 'failed', 'refunded'] } },
-    data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
-  })
-  if (claimed.count === 0) return // already in a terminal state — skip
+  let releaseInvariantBroken = false
+  const claimed = await prisma.$transaction(async (tx) => {
+    // Covers 'pending' (processDecodlSubmission) and 'processing' (pollDecodlJobs).
+    // Only one concurrent failer transitions to 'failed'.
+    const claimResult = await tx.download.updateMany({
+      where: { id: download.id, status: { notIn: ['completed', 'failed', 'refunded'] } },
+      data: { status: 'failed', errorMessage, lastPolledAt: new Date() },
+    })
+    if (claimResult.count === 0) return false
 
-  // Send failure email (non-blocking)
-  const userForEmail = await context.entities.User.findUnique({
+    if (cost > 0) {
+      const rows = await tx.$executeRaw`
+        UPDATE "User"
+        SET "reservedCredits" = "reservedCredits" - ${cost}
+        WHERE "id" = ${download.userId}
+          AND "reservedCredits" >= ${cost}
+      `
+
+      if (Number(rows) === 0) {
+        releaseInvariantBroken = true
+        log.error('release_invariant_violation', {
+          downloadId: download.id,
+          userId: download.userId,
+          cost,
+        })
+      }
+
+      const user = await tx.user.findUnique({ where: { id: download.userId } })
+      const balance = user
+        ? user.credits - user.reservedCredits
+        : 0
+
+      await tx.creditTransaction.create({
+        data: {
+          userId: download.userId,
+          amount: cost, // visible balance goes back up — reservation released
+          balance,
+          type: 'refund',
+          reference: download.id,
+          description: `Download failed — ${download.providerSlug} reservation released (no charge)`,
+        },
+      })
+    }
+
+    return true
+  })
+
+  if (releaseInvariantBroken) {
+    void alertCritical('ledger.release_invariant', {
+      downloadId: download.id,
+      userId: download.userId,
+      cost,
+    })
+  }
+
+  if (!claimed) return // already in a terminal state — skip
+
+  // Email OUTSIDE the transaction
+  const userForEmail = await prisma.user.findUnique({
     where: { id: download.userId },
     select: { email: true },
   })
@@ -313,30 +586,10 @@ async function handleDownloadFailure(download: any, context: any, errorMessage: 
     })
   }
 
-  if (cost <= 0) return // zero-cost download — no reservation to release
-
-  const user = await context.entities.User.findUnique({ where: { id: download.userId } })
-  if (!user) return
-
-  // Use { decrement } not stale absolute value — reservation guarantees reservedCredits >= cost
-  const approxAvailable = user.credits - Math.max(0, user.reservedCredits - cost)
-
-  await Promise.all([
-    context.entities.User.update({
-      where: { id: user.id },
-      data: { reservedCredits: { decrement: cost } },
-    }),
-    context.entities.CreditTransaction.create({
-      data: {
-        userId: user.id,
-        amount: cost, // visible balance goes back up — reservation released
-        balance: approxAvailable,
-        type: 'refund',
-        reference: download.id,
-        description: `Download failed — ${download.providerSlug} reservation released (no charge)`,
-      },
-    }),
-  ])
-
-  console.log(`[Reserve] Released ${cost} reserved credits for user ${download.userId} — no charge. Reason: ${errorMessage}`)
+  log.info('reserve_released', {
+    downloadId: download.id,
+    userId: download.userId,
+    cost,
+    reason: errorMessage,
+  })
 }

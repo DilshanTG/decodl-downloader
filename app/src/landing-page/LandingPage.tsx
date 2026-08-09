@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link as WaspLink, routes } from "wasp/client/router";
 
 // Only slugs that have actual files in /public/provider-logos/
@@ -9,7 +10,7 @@ const PROVIDERS = [
 ];
 
 const FEATURES = [
-  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Pay in LKR Only", desc: "Zero USD. Zero bank fees. Zero card blocks. Pure Sri Lankan Rupees.", accent: "border-emerald-500/20 bg-emerald-500/5", icon_c: "text-emerald-500 bg-emerald-500/10" },
+  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Up to 91% Cheaper", desc: "Same Shutterstock, Adobe Stock, Freepik files — at a fraction of the official price. No USD subscription needed.", accent: "border-emerald-500/20 bg-emerald-500/5", icon_c: "text-emerald-500 bg-emerald-500/10" },
   { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Instant File Delivery", desc: "Paste URL, confirm cost, receive file. Under 60 seconds for most downloads.", accent: "border-primary/20 bg-primary/5", icon_c: "text-primary bg-primary/10" },
   { icon: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15", title: "Auto-Refund Guarantee", desc: "Download fails? Credits returned in seconds. Every single time.", accent: "border-amber-500/20 bg-amber-500/5", icon_c: "text-amber-500 bg-amber-500/10" },
   { icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10", title: "20+ Premium Sources", desc: "Shutterstock, Freepik, Adobe Stock, Envato, iStock, Getty — one account.", accent: "border-secondary/20 bg-secondary/5", icon_c: "text-secondary bg-secondary/10" },
@@ -41,6 +42,52 @@ const FAQS = [
   { q: "Do you provide licenses or subscriptions?", a: "No — files only. We do not generate license certificates in your name or transfer platform accounts. Ensure your use complies with the original platform's terms." },
   { q: "How fast are downloads?", a: "Most files ready in 30–90 seconds. Bulk downloads take 2–5 minutes." },
 ];
+
+const HERO_PROVIDERS = [
+  { slug: "shutterstock",    name: "Shutterstock" },
+  { slug: "adobestock",      name: "Adobe Stock" },
+  { slug: "istockphoto",     name: "iStockphoto" },
+  { slug: "123rf",           name: "123RF" },
+  { slug: "freepik",         name: "Freepik" },
+  { slug: "envato_elements", name: "Envato Elements" },
+  { slug: "depositphotos",   name: "DepositPhotos" },
+  { slug: "flaticon",        name: "Flaticon" },
+];
+
+function RotatingProviderBadges() {
+  const [active, setActive] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setActive((i) => (i + 1) % HERO_PROVIDERS.length);
+        setVisible(true);
+      }, 300);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const p = HERO_PROVIDERS[active];
+
+  return (
+    <div className="flex items-center justify-center mb-6 h-12">
+      <img
+        key={p.slug}
+        src={`/provider-logos/png/${p.slug}.png`}
+        alt={p.name}
+        className="h-10 max-w-[200px] object-contain transition-all duration-300"
+        style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(-6px)" }}
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (!img.dataset.tried) { img.dataset.tried = "1"; img.src = `/provider-logos/${p.slug}.svg`; }
+          else img.style.display = "none";
+        }}
+      />
+    </div>
+  );
+}
 
 // Provider logo marquee
 function ProviderMarquee() {
@@ -79,32 +126,46 @@ export default function LandingPage() {
             Sri Lanka's #1 Stock Media Platform
           </div>
 
+          <RotatingProviderBadges />
+
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[88px] font-black tracking-[-0.03em] leading-[1.0] mb-6">
-            Premium Assets.<br />
-            <span className="text-primary">Pay in LKR.</span>
+            Same Assets.<br />
+            <span className="text-primary">90% Cheaper.</span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-4">
-            Download from <strong className="text-foreground">20+ global stock platforms</strong> — Shutterstock, Freepik, Adobe Stock, Envato Elements and more.{" "}
-            <strong className="text-foreground">No USD. No subscriptions. No card blocks.</strong>
-          </p>
-          <p className="text-base text-primary font-semibold mb-10">
-            Built for Sri Lankan designers, editors & creative agencies. 🇱🇰
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+            Download from <strong className="text-foreground">20+ premium stock platforms</strong> at a fraction of what they charge directly.
+            No subscription. Pay only for what you download.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-14">
+          {/* Inline price comparison */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 mb-10 max-w-md mx-auto w-full">
+            <div className="w-full sm:flex-1 rounded-2xl border border-red-500/25 bg-red-500/5 px-5 py-3.5 text-center">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-red-500/70 mb-0.5">Shutterstock Direct</div>
+              <div className="text-2xl font-black text-foreground/60 line-through decoration-red-500/60">$49<span className="text-base">/mo</span></div>
+              <div className="text-xs text-red-500 font-bold mt-0.5">≈ Rs. 16,170/month</div>
+            </div>
+            <div className="text-xl font-black text-muted-foreground/30 hidden sm:block">→</div>
+            <div className="w-full sm:flex-1 rounded-2xl border border-primary/40 bg-primary/8 px-5 py-3.5 text-center shadow-sm shadow-primary/10">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">StockMart</div>
+              <div className="text-2xl font-black text-primary">Rs. 200</div>
+              <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">per image · no commitment</div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-12">
             <WaspLink to={routes.SignupRoute.to} className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-4 rounded-2xl text-base shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Start Free — 2 Credits on Signup
             </WaspLink>
             <WaspLink to={routes.PricingPageRoute.to} className="inline-flex items-center gap-2 border border-border hover:border-primary/30 bg-card text-foreground font-bold px-8 py-4 rounded-2xl text-base hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
-              View LKR Pricing
+              See Full Savings Breakdown
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
             </WaspLink>
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-2 justify-center text-sm text-muted-foreground mb-12">
-            {["2 free credits, no card required", "No USD conversion ever", "Credits never expire", "Auto-refund on failures"].map((t) => (
+            {["2 free credits, no card required", "Same files — 90%+ less cost", "Credits never expire", "Auto-refund on failures"].map((t) => (
               <span key={t} className="flex items-center gap-1.5">
                 <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                 {t}
@@ -122,7 +183,7 @@ export default function LandingPage() {
       {/* ── STATS BAR ── */}
       <section className="border-y border-border bg-muted/20 py-8 px-4">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {[{ value: "20+", label: "Premium Providers" }, { value: "LKR", label: "Local Currency Only" }, { value: "60s", label: "Avg Download Time" }, { value: "100%", label: "Auto-Refund on Fail" }].map((s) => (
+          {[{ value: "20+", label: "Premium Providers" }, { value: "91%", label: "Cheaper Than Direct" }, { value: "60s", label: "Avg Download Time" }, { value: "Rs. 200", label: "Per Standard Image" }].map((s) => (
             <div key={s.label}>
               <div className="text-3xl font-black text-primary mb-1">{s.value}</div>
               <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{s.label}</div>
@@ -381,11 +442,11 @@ export default function LandingPage() {
           <div className="text-center mb-14">
             <span className="text-xs font-bold uppercase tracking-widest text-primary mb-3 block">The Math is Simple</span>
             <h2 className="text-4xl sm:text-5xl font-black tracking-tight mb-4 text-foreground">
-              Why Pay USD Prices<br />
-              <span className="text-primary">When You Can Pay LKR?</span>
+              Why Pay Full Price<br />
+              <span className="text-primary">When You Can Save 90%?</span>
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Monthly subscriptions cost thousands in LKR — even when you barely use them. StockMart lets you pay only for what you download.
+              Official subscriptions lock you into monthly fees — whether you download 1 file or 100. StockMart charges per download only. Same files. Fraction of the price.
             </p>
           </div>
 
@@ -668,10 +729,10 @@ export default function LandingPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />Free to Start
               </div>
               <h2 className="text-4xl sm:text-5xl font-black tracking-tight mb-4">
-                Stop Paying USD.<br />
-                <span className="text-primary">Start Downloading in LKR.</span>
+                Stop Overpaying.<br />
+                <span className="text-primary">Get 90% Off Premium Assets.</span>
               </h2>
-              <p className="text-muted-foreground mb-8 max-w-md mx-auto">Join hundreds of Sri Lankan designers, editors and agencies. 2 free credits — no card required.</p>
+              <p className="text-muted-foreground mb-8 max-w-md mx-auto">Join hundreds of Sri Lankan designers, editors and agencies already saving 90%+ on every download. 2 free credits — no card required.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <WaspLink to={routes.SignupRoute.to} className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-4 rounded-2xl text-base shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all cursor-pointer">
                   Create Free Account

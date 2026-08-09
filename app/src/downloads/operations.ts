@@ -1,7 +1,37 @@
 import { type GetMyDownloads, type GetDownloadById, type SubmitDownload, type RetryFailedDownload, type GetAssetInfo, type GetDecodlBalance } from 'wasp/server/operations'
-import { HttpError } from 'wasp/server'
+import { HttpError, prisma } from 'wasp/server'
 import { processDecodlSubmission } from 'wasp/server/jobs'
 import { detectProviderFromUrl, getDecodlAssetInfo, fetchDecodlBalance } from '../decodl/client'
+
+/**
+ * Atomic column-compare reservation: reservedCredits += cost only when
+ * reservedCredits + cost <= credits. Returns true if the row was updated.
+ * Avoids stale snapshot of user.credits from a prior read.
+ */
+async function reserveCredits(userId: string, cost: number): Promise<boolean> {
+  if (cost <= 0) return true
+  const affected = await prisma.$executeRaw`
+    UPDATE "User"
+    SET "reservedCredits" = "reservedCredits" + ${cost}
+    WHERE "id" = ${userId}
+      AND "reservedCredits" + ${cost} <= "credits"
+  `
+  return Number(affected) > 0
+}
+
+/**
+ * Release a reservation that will not be used (e.g. failed retry claim).
+ * Guarded so reservedCredits cannot go negative.
+ */
+async function releaseReservedCredits(userId: string, cost: number): Promise<void> {
+  if (cost <= 0) return
+  await prisma.$executeRaw`
+    UPDATE "User"
+    SET "reservedCredits" = "reservedCredits" - ${cost}
+    WHERE "id" = ${userId}
+      AND "reservedCredits" >= ${cost}
+  `
+}
 
 type GetMyDownloadsInput = { page?: number; status?: string; providerSlug?: string }
 type GetMyDownloadsOutput = { downloads: any[]; total: number; page: number; totalPages: number }
@@ -133,26 +163,21 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
   }
 
   // 4. ATOMIC credit reserve — skipped for sandbox (free) providers.
+  //    Column-compare: reservedCredits + cost <= credits (no stale snapshot of credits).
   if (!isSandbox) {
-    // updateMany WHERE clause is evaluated atomically at the DB level.
-    // Two simultaneous requests cannot both succeed: the first increments reservedCredits,
-    // causing the second's WHERE check (reservedCredits <= credits - cost) to fail.
-    const reserved = await context.entities.User.updateMany({
-      where: {
-        id: user.id,
-        reservedCredits: { lte: user.credits - creditCost },
-      },
-      data: { reservedCredits: { increment: creditCost } },
-    })
-    if (reserved.count === 0) {
-      const available = user.credits - user.reservedCredits
-      throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${user.reservedCredits.toFixed(1)} reserved in active downloads).`)
+    const reserved = await reserveCredits(user.id, creditCost)
+    if (!reserved) {
+      const fresh = await context.entities.User.findUnique({ where: { id: user.id } })
+      const available = (fresh?.credits ?? 0) - (fresh?.reservedCredits ?? 0)
+      throw new HttpError(402, `Insufficient credits. You need ${creditCost} credits but have ${available.toFixed(1)} available (${(fresh?.reservedCredits ?? 0).toFixed(1)} reserved in active downloads).`)
     }
   }
 
-  const availableAfterReserve = isSandbox
-    ? (user.credits - user.reservedCredits)
-    : (user.credits - user.reservedCredits - creditCost)
+  // Re-read after reserve for accurate ledger balance
+  const userAfter = await context.entities.User.findUnique({ where: { id: user.id } })
+  const availableAfterReserve = userAfter
+    ? userAfter.credits - userAfter.reservedCredits
+    : (user.credits - user.reservedCredits - (isSandbox ? 0 : creditCost))
 
   const txOps = isSandbox ? [] : [
     context.entities.CreditTransaction.create({
@@ -179,6 +204,7 @@ export const submitDownload: SubmitDownload<SubmitDownloadInput, any> = async (
         creditsCharged: creditCost,
         errorMessage: null,
         lastPolledAt: null,
+        // attemptStartedAt defaults to now() via schema
       },
     }),
     ...txOps,
@@ -198,48 +224,56 @@ export const retryFailedDownload: RetryFailedDownload<{ id: string }, any> = asy
   const download = await context.entities.Download.findUnique({ where: { id } })
   if (!download) throw new HttpError(404)
   if (download.userId !== context.user.id) throw new HttpError(403)
-  if (download.status !== 'failed') throw new HttpError(400, 'Only failed downloads can be retried')
-  if (download.retryCount >= 3) throw new HttpError(400, 'Maximum retry attempts (3) reached')
 
+  const cost = download.creditsCharged
   const user = await context.entities.User.findUnique({ where: { id: context.user.id } })
   if (!user) throw new HttpError(404)
 
-  // Atomic reserve — same race-condition-proof pattern as submitDownload
-  const reserved = await context.entities.User.updateMany({
-    where: {
-      id: user.id,
-      reservedCredits: { lte: user.credits - download.creditsCharged },
-    },
-    data: { reservedCredits: { increment: download.creditsCharged } },
-  })
-  if (reserved.count === 0) {
-    const available = user.credits - user.reservedCredits
-    throw new HttpError(402, `Insufficient credits. You need ${download.creditsCharged} credits but have ${available.toFixed(1)} available.`)
+  // Reserve FIRST, then atomic claim — avoids double-reserve under concurrent retries
+  // and avoids stale status/retryCount check-then-act.
+  const reserved = await reserveCredits(user.id, cost)
+  if (!reserved) {
+    const fresh = await context.entities.User.findUnique({ where: { id: user.id } })
+    const available = (fresh?.credits ?? 0) - (fresh?.reservedCredits ?? 0)
+    throw new HttpError(402, `Insufficient credits. You need ${cost} credits but have ${available.toFixed(1)} available.`)
   }
 
-  const availableAfterReserve = user.credits - user.reservedCredits - download.creditsCharged
+  const claimed = await context.entities.Download.updateMany({
+    where: {
+      id,
+      userId: context.user.id,
+      status: 'failed',
+      retryCount: { lt: 3 },
+    },
+    data: {
+      status: 'pending',
+      decodlJobId: null,
+      retryCount: { increment: 1 },
+      errorMessage: null,
+      lastPolledAt: null,
+      attemptStartedAt: new Date(),
+    },
+  })
 
-  await Promise.all([
-    context.entities.Download.update({
-      where: { id },
-      data: {
-        status: 'pending',
-        decodlJobId: null,
-        retryCount: { increment: 1 },
-        errorMessage: null,
-        lastPolledAt: null,
-      },
-    }),
-    context.entities.CreditTransaction.create({
-      data: {
-        userId: user.id,
-        amount: -download.creditsCharged,
-        balance: availableAfterReserve,
-        type: 'download',
-        description: `Credits reserved for retry — ${download.providerSlug} (pending)`,
-      },
-    }),
-  ])
+  if (claimed.count === 0) {
+    await releaseReservedCredits(user.id, cost)
+    throw new HttpError(400, 'Only failed downloads can be retried (or max retries reached)')
+  }
+
+  const userAfter = await context.entities.User.findUnique({ where: { id: user.id } })
+  const availableAfterReserve = userAfter
+    ? userAfter.credits - userAfter.reservedCredits
+    : (user.credits - user.reservedCredits - cost)
+
+  await context.entities.CreditTransaction.create({
+    data: {
+      userId: user.id,
+      amount: -cost,
+      balance: availableAfterReserve,
+      type: 'download',
+      description: `Credits reserved for retry — ${download.providerSlug} (pending)`,
+    },
+  })
 
   await processDecodlSubmission.submit({ downloadId: id })
 

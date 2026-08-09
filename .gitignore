@@ -6,6 +6,12 @@
 .env.*
 !.env.example
 !.env.*.example
+app/.env.server
+app/.env.client
+
+# Credentials dumps (keep out of git entirely)
+STOCKMART_CREDENTIALS.txt
+../STOCKMART_CREDENTIALS.txt
 
 # Wasp build output
 app/.wasp/

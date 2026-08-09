@@ -5,6 +5,8 @@ import { Link } from "wasp/client/router";
 import { routes } from "wasp/client/router";
 import { groupDownloads, getBatchStatusText } from "../shared/grouping";
 import { useToast } from "../client/hooks/use-toast";
+import { toFriendlyError } from "../client/lib/errorToast";
+import { ToastAction } from "../client/components/ui/toast";
 import { Button } from "../client/components/ui/button";
 import type { ProviderPricing } from "wasp/entities";
 import {
@@ -113,7 +115,21 @@ export default function HistoryPage() {
       refetch();
       toast({ title: "Retry submitted", description: "Your download has been re-queued." });
     } catch (err: any) {
-      toast({ title: "Retry failed", description: err?.message || "Could not retry.", variant: "destructive" });
+      const friendly = toFriendlyError(err);
+      toast({
+        title: friendly.title,
+        description: friendly.description,
+        variant: "destructive",
+        action:
+          friendly.actionHref && friendly.actionLabel ? (
+            <ToastAction
+              altText={friendly.actionLabel}
+              onClick={() => { window.location.href = friendly.actionHref!; }}
+            >
+              {friendly.actionLabel}
+            </ToastAction>
+          ) : undefined,
+      });
     } finally {
       setRetryingId(null);
     }

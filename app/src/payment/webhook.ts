@@ -1,6 +1,9 @@
 import { type PayhereWebhook } from 'wasp/server/api'
+import { prisma } from 'wasp/server'
 import express from 'express'
 import crypto from 'crypto'
+import { alertCritical } from '../server/alerts'
+import { log } from '../server/logger'
 
 const DIGIMART_BASE = 'https://pay.digimartsolutions.lk'
 
@@ -38,6 +41,7 @@ async function fetchOrderStatus(orderId: string): Promise<string | null> {
   try {
     const res = await fetch(`${DIGIMART_BASE}/api/v1/status/${orderId}`, {
       headers: { 'Authorization': `Bearer ${process.env.PAYHERE_MERCHANT_KEY}` },
+      signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) return null
     const body = await res.json() as { status: string; data: { status: string } }
@@ -47,7 +51,64 @@ async function fetchOrderStatus(orderId: string): Promise<string | null> {
   }
 }
 
-export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
+/**
+ * Atomic claim → credit → ledger. Rolls back the claim if credit or ledger fails.
+ * Returns true if this call granted credits; false if already processed.
+ */
+async function claimAndCreditPayment(args: {
+  paymentId: string
+  userId: string
+  creditsAwarded: number
+  amountLKR: number
+  orderId: string
+  payherePaymentId: string | null
+  rawPayload: Record<string, string> | null
+  description: string
+}): Promise<boolean> {
+  const result = await prisma.$transaction(async (tx) => {
+    // Atomic check-and-set: prevents double-credit if webhook fires twice or
+    // races with getMyCreditBalance polling the same payment simultaneously.
+    const webhookClaimed = await tx.payment.updateMany({
+      where: { id: args.paymentId, status: { not: 'paid' } },
+      data: {
+        status: 'paid',
+        payherePaymentId: args.payherePaymentId,
+        rawPayload: (args.rawPayload as any) ?? undefined,
+        updatedAt: new Date(),
+      },
+    })
+    if (webhookClaimed.count === 0) {
+      return false
+    }
+
+    // Use increment (not absolute write) so concurrent credits don't overwrite each other
+    const updatedUser = await tx.user.update({
+      where: { id: args.userId },
+      data: {
+        credits: { increment: args.creditsAwarded },
+        lifetimeCreditsEarned: { increment: args.creditsAwarded },
+        lifetimeSpentLKR: { increment: args.amountLKR },
+      },
+    })
+
+    await tx.creditTransaction.create({
+      data: {
+        userId: args.userId,
+        amount: args.creditsAwarded,
+        balance: updatedUser.credits,
+        type: 'purchase',
+        reference: args.paymentId,
+        description: args.description,
+      },
+    })
+
+    return true
+  })
+
+  return result
+}
+
+export const payhereWebhook: PayhereWebhook = async (req, res, _context) => {
   try {
     const data: Record<string, string> = req.body
 
@@ -66,7 +127,7 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
     }
 
     // Find payment record by DigiMart's order_id
-    const payment = await context.entities.Payment.findUnique({
+    const payment = await prisma.payment.findUnique({
       where: { payhereOrderId: order_id },
       include: { user: true },
     })
@@ -106,72 +167,72 @@ export const payhereWebhook: PayhereWebhook = async (req, res, context) => {
       if (apiStatus) resolvedStatus = apiStatus
     }
 
-    console.log(`Webhook: order=${order_id} status=${resolvedStatus}`)
+    log.info('webhook_status', { orderId: order_id, status: resolvedStatus, paymentId: payment.id })
 
     if (resolvedStatus === 'SUCCESS') {
-      // Atomic check-and-set: prevents double-credit if webhook fires twice or
-      // races with getMyCreditBalance polling the same payment simultaneously.
-      const webhookClaimed = await context.entities.Payment.updateMany({
-        where: { id: payment.id, status: { not: 'paid' } },
-        data: {
-          status: 'paid',
-          payherePaymentId: data.payment_id ?? data.payhere_ref ?? null,
-          rawPayload: data as any,
-          updatedAt: new Date(),
-        },
+      const credited = await claimAndCreditPayment({
+        paymentId: payment.id,
+        userId: payment.userId,
+        creditsAwarded: payment.creditsAwarded,
+        amountLKR: payment.amountLKR,
+        orderId: order_id,
+        payherePaymentId: data.payment_id ?? data.payhere_ref ?? null,
+        rawPayload: data,
+        description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Order: ${order_id})`,
       })
-      if (webhookClaimed.count === 0) {
+
+      if (!credited) {
         return res.status(200).send('Already processed')
       }
 
-      // Use increment (not absolute write) so concurrent credits don't overwrite each other
-      const updatedUser = await context.entities.User.update({
-        where: { id: payment.userId },
-        data: {
-          credits: { increment: payment.creditsAwarded },
-          lifetimeCreditsEarned: { increment: payment.creditsAwarded },
-          lifetimeSpentLKR: { increment: payment.amountLKR },
-        },
+      log.info('webhook_credited', {
+        orderId: order_id,
+        userId: payment.userId,
+        credits: payment.creditsAwarded,
       })
-
-      await context.entities.CreditTransaction.create({
-        data: {
-          userId: payment.userId,
-          amount: payment.creditsAwarded,
-          balance: updatedUser.credits,
-          type: 'purchase',
-          reference: payment.id,
-          description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Order: ${order_id})`,
-        },
-      })
-
-      console.log(`Credited ${payment.creditsAwarded} credits to user ${payment.userId}`)
 
     } else if (resolvedStatus === 'PENDING') {
-      await context.entities.Payment.update({
-        where: { id: payment.id },
+      // Terminal states (paid/failed/cancelled/refunded) are immutable except via SUCCESS claim
+      const updated = await prisma.payment.updateMany({
+        where: { id: payment.id, status: 'pending' },
         data: { status: 'pending', rawPayload: data as any },
       })
+      if (updated.count === 0) {
+        console.log(`Webhook: skipped PENDING write for order ${order_id} — payment no longer pending`)
+      }
     } else if (resolvedStatus === 'CANCELLED') {
-      await context.entities.Payment.update({
-        where: { id: payment.id },
+      const updated = await prisma.payment.updateMany({
+        where: { id: payment.id, status: 'pending' },
         data: { status: 'cancelled', rawPayload: data as any },
       })
+      if (updated.count === 0) {
+        console.log(`Webhook: skipped CANCELLED write for order ${order_id} — payment no longer pending`)
+      }
     } else if (resolvedStatus === 'FAILED') {
-      await context.entities.Payment.update({
-        where: { id: payment.id },
+      const updated = await prisma.payment.updateMany({
+        where: { id: payment.id, status: 'pending' },
         data: { status: 'failed', rawPayload: data as any },
       })
+      if (updated.count === 0) {
+        console.log(`Webhook: skipped FAILED write for order ${order_id} — payment no longer pending`)
+      }
     } else if (resolvedStatus === 'REFUNDED') {
-      await context.entities.Payment.update({
-        where: { id: payment.id },
+      const updated = await prisma.payment.updateMany({
+        where: { id: payment.id, status: 'pending' },
         data: { status: 'refunded', rawPayload: data as any },
       })
+      if (updated.count === 0) {
+        console.log(`Webhook: skipped REFUNDED write for order ${order_id} — payment no longer pending`)
+      }
     }
 
     res.status(200).send('OK')
-  } catch (error) {
-    console.error('Webhook error:', error)
+  } catch (error: any) {
+    log.error('webhook_error', { error: error?.message || String(error) })
+    void alertCritical('payment.webhook_error', {
+      orderId: (req.body as any)?.order_id,
+      message: error?.message || 'Internal error',
+    })
     res.status(500).send('Internal error')
   }
 }

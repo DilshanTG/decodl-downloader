@@ -1,4 +1,5 @@
 import { HttpError, prisma } from 'wasp/server'
+import { emailSender } from 'wasp/server/email'
 import type {
   AdminGetOverviewStats,
   AdminGetAllDownloads,
@@ -20,12 +21,80 @@ import { processDecodlSubmission } from 'wasp/server/jobs'
 import { invalidatePricingCache } from '../credits/operations'
 import { invalidatePackagesCache } from '../payment/operations'
 import { createPasswordResetLink } from 'wasp/server/auth/email'
+import { getPasswordResetEmailContent } from '../auth/email-and-pass/emails'
+import { ensureArgsSchemaOrThrowHttpError } from '../server/validation'
+import { fetchDecodlBalance } from '../decodl/client'
+import { lastReconcileSummary } from '../downloads/jobs'
+import * as z from 'zod'
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 function requireAdmin(context: any) {
   if (!context.user) throw new HttpError(401, 'Authentication required')
   if (!context.user.isAdmin) throw new HttpError(403, 'Admin access required')
 }
+
+/**
+ * Append-only privileged-action trail. Accepts prisma or a $transaction client.
+ * NEVER pass secrets, reset links, or tokens in metadata.
+ */
+async function writeAudit(
+  client: { adminAuditLog: { create: (args: any) => Promise<any> } },
+  adminUser: { id: string; email?: string | null },
+  action: string,
+  targetType?: string | null,
+  targetId?: string | null,
+  metadata?: Record<string, unknown> | null,
+) {
+  await client.adminAuditLog.create({
+    data: {
+      adminId: adminUser.id,
+      adminEmail: adminUser.email ?? null,
+      action,
+      targetType: targetType ?? null,
+      targetId: targetId ?? null,
+      metadata: metadata ?? undefined,
+    },
+  })
+}
+
+// ─── Zod schemas for mutating admin inputs ────────────────────────────────────
+const adminAdjustUserCreditsSchema = z.object({
+  userId: z.string().min(1),
+  amount: z.number().finite(),
+  reason: z.string().min(1),
+})
+
+const adminUpdateProviderPricingSchema = z.object({
+  id: z.string().min(1),
+  creditCost: z.number().finite().optional(),
+  isActive: z.boolean().optional(),
+  displayName: z.string().optional(),
+  sortOrder: z.number().finite().optional(),
+})
+
+const adminCreateCreditPackageSchema = z.object({
+  packageId: z.string().min(1),
+  name: z.string().min(1),
+  credits: z.number().finite(),
+  priceLKR: z.number().finite(),
+  badge: z.string().optional(),
+  isPopular: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().finite().optional(),
+  description: z.string().optional(),
+})
+
+const adminUpdateCreditPackageSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().optional(),
+  credits: z.number().finite().optional(),
+  priceLKR: z.number().finite().optional(),
+  badge: z.string().nullable().optional(),
+  isPopular: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().finite().optional(),
+  description: z.string().nullable().optional(),
+})
 
 // ─── Overview Stats ───────────────────────────────────────────────────────────
 export const adminGetOverviewStats: AdminGetOverviewStats<void, any> = async (_args, context) => {
@@ -271,6 +340,56 @@ export const adminGetAllCreditTransactions: AdminGetAllCreditTransactions<
   return { transactions, total, page: safePage, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
+// ─── System Health (operator pane) ────────────────────────────────────────────
+export const adminGetSystemHealth = async (_args: void, context: any) => {
+  requireAdmin(context)
+
+  const now = Date.now()
+  const dayAgo = new Date(now - 24 * 60 * 60 * 1000)
+  const fifteenMinAgo = new Date(now - 15 * 60 * 1000)
+
+  const [
+    recentAudit,
+    pendingPayments,
+    failedDownloads24h,
+    refundedDownloads24h,
+    pendingDownloads,
+    processingDownloads,
+  ] = await Promise.all([
+    prisma.adminAuditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
+    prisma.payment.count({
+      where: { status: 'pending', createdAt: { lt: fifteenMinAgo } },
+    }),
+    prisma.download.count({
+      where: { status: 'failed', createdAt: { gte: dayAgo } },
+    }),
+    prisma.download.count({
+      where: { status: 'refunded', createdAt: { gte: dayAgo } },
+    }),
+    prisma.download.count({ where: { status: 'pending' } }),
+    prisma.download.count({ where: { status: 'processing' } }),
+  ])
+
+  const decodl = await fetchDecodlBalance()
+
+  return {
+    recentAudit,
+    pendingPayments,
+    failedDownloads24h,
+    refundedDownloads24h,
+    activeDownloads: pendingDownloads + processingDownloads,
+    pendingDownloads,
+    processingDownloads,
+    decodlBalance: decodl.balance,
+    decodlAvailable: decodl.available,
+    lastReconcile: lastReconcileSummary,
+    generatedAt: new Date().toISOString(),
+  }
+}
+
 // ─── Adjust User Credits ──────────────────────────────────────────────────────
 type AdminAdjustUserCreditsInput = {
   userId: string
@@ -281,51 +400,93 @@ type AdminAdjustUserCreditsInput = {
 export const adminAdjustUserCredits: AdminAdjustUserCredits<
   AdminAdjustUserCreditsInput,
   { newBalance: number }
-> = async ({ userId, amount, reason }, context) => {
+> = async (rawArgs, context) => {
   requireAdmin(context)
-  if (!userId || amount === undefined) throw new HttpError(400, 'userId and amount required')
-  if (reason?.trim().length === 0) throw new HttpError(400, 'Reason is required')
-  if (!Number.isFinite(amount)) throw new HttpError(400, 'Amount must be a finite number.')
-  if (Math.abs(amount) > 10_000) throw new HttpError(400, 'Adjustment amount cannot exceed ±10,000 credits per operation.')
+  const { userId, amount, reason: rawReason } = ensureArgsSchemaOrThrowHttpError(
+    adminAdjustUserCreditsSchema,
+    rawArgs,
+  )
+  if (typeof rawReason !== 'string' || rawReason.trim().length === 0) {
+    throw new HttpError(400, 'Reason is required')
+  }
+  const reason = rawReason.trim().slice(0, 500)
+  if (Math.abs(amount) > 10_000) {
+    throw new HttpError(400, 'Adjustment amount cannot exceed ±10,000 credits per operation.')
+  }
 
   const adminUser = context.user!
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new HttpError(404, 'User not found')
 
-  if (amount < 0 && user.credits + amount < 0) {
-    throw new HttpError(400, `Cannot adjust balance below zero. User has ${user.credits} credits.`)
-  }
+  const description = `Admin adjustment: ${reason} (by admin ${adminUser.email ?? adminUser.id})`
 
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      credits: { increment: amount },
-      ...(amount > 0
-        ? { lifetimeCreditsEarned: { increment: amount } }
-        : { lifetimeCreditsSpent: { increment: Math.abs(amount) } }),
-    },
-  })
-
-  let finalBalance = updatedUser.credits
-  if (updatedUser.credits < 0) {
-    const correctedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { credits: 0 },
+  if (amount < 0) {
+    // Guarded atomic debit: cannot push credits below zero; no absolute clamp write.
+    const newBalance = await prisma.$transaction(async (tx) => {
+      const spent = Math.abs(amount)
+      const rows = await tx.$executeRaw`
+        UPDATE "User"
+        SET
+          "credits" = "credits" + ${amount},
+          "lifetimeCreditsSpent" = "lifetimeCreditsSpent" + ${spent}
+        WHERE "id" = ${userId}
+          AND "credits" + ${amount} >= 0
+      `
+      if (Number(rows) === 0) {
+        const fresh = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } })
+        throw new HttpError(
+          400,
+          `Cannot adjust balance below zero. User has ${fresh?.credits ?? user.credits} credits.`
+        )
+      }
+      const updated = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } })
+      if (!updated) throw new HttpError(404, 'User not found')
+      await tx.creditTransaction.create({
+        data: {
+          userId,
+          amount,
+          balance: updated.credits,
+          type: 'admin_adjust',
+          description,
+        },
+      })
+      await writeAudit(tx, adminUser, 'adjust_credits', 'User', userId, {
+        amount,
+        reason,
+        newBalance: updated.credits,
+      })
+      return updated.credits
     })
-    finalBalance = correctedUser.credits
+    return { newBalance }
   }
 
-  await prisma.creditTransaction.create({
-    data: {
-      userId,
+  // Positive (or zero) adjustments: increment + ledger in one transaction
+  const newBalance = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: {
+        credits: { increment: amount },
+        ...(amount > 0 ? { lifetimeCreditsEarned: { increment: amount } } : {}),
+      },
+    })
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount,
+        balance: updatedUser.credits,
+        type: 'admin_adjust',
+        description,
+      },
+    })
+    await writeAudit(tx, adminUser, 'adjust_credits', 'User', userId, {
       amount,
-      balance: finalBalance,
-      type: 'admin_adjust',
-      description: `Admin adjustment: ${reason} (by admin ${adminUser.email ?? adminUser.id})`,
-    },
+      reason,
+      newBalance: updatedUser.credits,
+    })
+    return updatedUser.credits
   })
 
-  return { newBalance: finalBalance }
+  return { newBalance }
 }
 
 // ─── Update Provider Pricing ──────────────────────────────────────────────────
@@ -340,11 +501,17 @@ type AdminUpdateProviderPricingInput = {
 export const adminUpdateProviderPricing: AdminUpdateProviderPricing<
   AdminUpdateProviderPricingInput,
   any
-> = async ({ id, creditCost, isActive, displayName, sortOrder }, context) => {
+> = async (rawArgs, context) => {
   requireAdmin(context)
-  if (!id) throw new HttpError(400, 'Provider ID required')
+  const { id, creditCost, isActive, displayName, sortOrder } = ensureArgsSchemaOrThrowHttpError(
+    adminUpdateProviderPricingSchema,
+    rawArgs,
+  )
 
   if (creditCost !== undefined && creditCost < 0) throw new HttpError(400, 'Credit cost cannot be negative.')
+
+  const existing = await prisma.providerPricing.findUnique({ where: { id } })
+  if (!existing) throw new HttpError(404, 'Provider pricing not found')
 
   const data: any = {}
   if (creditCost !== undefined) data.creditCost = creditCost
@@ -354,6 +521,22 @@ export const adminUpdateProviderPricing: AdminUpdateProviderPricing<
 
   const result = await prisma.providerPricing.update({ where: { id }, data })
   invalidatePricingCache()
+
+  await writeAudit(prisma, context.user!, 'update_provider_pricing', 'ProviderPricing', id, {
+    before: {
+      creditCost: existing.creditCost,
+      isActive: existing.isActive,
+      displayName: existing.displayName,
+      sortOrder: existing.sortOrder,
+    },
+    after: {
+      creditCost: result.creditCost,
+      isActive: result.isActive,
+      displayName: result.displayName,
+      sortOrder: result.sortOrder,
+    },
+  })
+
   return result
 }
 
@@ -381,12 +564,18 @@ export const adminForceRetryDownload: AdminForceRetryDownload<
       errorMessage: null,
       decodlJobId: null,
       lastPolledAt: null,
+      attemptStartedAt: new Date(),
       creditsCharged: 0,
     },
   })
 
   // Actually requeue the job — without this the download stays pending forever
   await processDecodlSubmission.submit({ downloadId })
+
+  await writeAudit(prisma, context.user!, 'force_retry_download', 'Download', downloadId, {
+    previousStatus: download.status,
+    providerSlug: download.providerSlug,
+  })
 
   return { success: true }
 }
@@ -426,31 +615,58 @@ export const adminGetFailedDownloads: AdminGetFailedDownloads<
 }
 
 // ─── Send Password Reset Email (Admin) ───────────────────────────────────────
+// Security: never return the reset link to the admin. Email the user only.
+// Refuse admin targets so a compromised admin cannot mint takeovers of peer admins.
 type AdminSendPasswordResetInput = { userId: string }
 
 export const adminSendPasswordReset: AdminSendPasswordReset<
   AdminSendPasswordResetInput,
-  { resetLink: string; email: string }
+  { sent: true; email: string }
 > = async ({ userId }, context) => {
   requireAdmin(context)
   if (!userId) throw new HttpError(400, 'userId required')
 
-  // Get email from User or AuthIdentity
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
-  let email = user?.email ?? null
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, isAdmin: true },
+  })
+  if (!user) throw new HttpError(404, 'User not found')
 
+  if (user.isAdmin) {
+    throw new HttpError(
+      403,
+      'Password resets for admin accounts must be done by the account owner directly.'
+    )
+  }
+
+  // Resolve email from User or AuthIdentity
+  let email = user.email ?? null
   if (!email) {
     const auth = await prisma.auth.findUnique({ where: { userId }, include: { identities: true } })
-    const identity = auth?.identities.find(i => i.providerName === 'email')
+    const identity = auth?.identities.find((i) => i.providerName === 'email')
     email = identity?.providerUserId ?? null
   }
 
   if (!email) throw new HttpError(404, 'No email auth found for this user')
 
-  // Generate a reset link directly — valid for 30 minutes
+  // Generate link server-side, email it, never return it in the response/logs
   const resetLink = await createPasswordResetLink(email, '/password-reset')
+  const content = getPasswordResetEmailContent({ passwordResetLink: resetLink })
 
-  return { resetLink, email }
+  await emailSender.send({
+    from: { name: 'StockMart.lk', email: 'noreply@stockmart.lk' },
+    to: email,
+    subject: content.subject,
+    text: content.text,
+    html: content.html,
+  })
+
+  await writeAudit(prisma, context.user!, 'send_password_reset', 'User', userId, {
+    // Never log the link itself
+    emailDomain: email.includes('@') ? email.split('@')[1] : undefined,
+  })
+
+  return { sent: true as const, email }
 }
 
 // ─── Grant Free Credits (Admin Approve) ──────────────────────────────────────
@@ -462,31 +678,41 @@ export const adminGrantFreeCredits = async ({ userId }: AdminGrantFreeCreditsInp
   if (!userId) throw new HttpError(400, 'userId required')
 
   const BONUS = 2
+  const adminUser = context.user!
 
-  const claimUpdate = await prisma.user.updateMany({
-    where: { id: userId, freeCreditsClaimed: false },
-    data: {
-      credits: { increment: BONUS },
-      lifetimeCreditsEarned: { increment: BONUS },
-      freeCreditsClaimed: true,
-    },
-  })
+  const finalBalance = await prisma.$transaction(async (tx) => {
+    const claimUpdate = await tx.user.updateMany({
+      where: { id: userId, freeCreditsClaimed: false },
+      data: {
+        credits: { increment: BONUS },
+        lifetimeCreditsEarned: { increment: BONUS },
+        freeCreditsClaimed: true,
+      },
+    })
 
-  if (claimUpdate.count === 0) {
-    throw new HttpError(400, 'Free credits already granted or user not found')
-  }
+    if (claimUpdate.count === 0) {
+      throw new HttpError(400, 'Free credits already granted or user not found')
+    }
 
-  const updatedUser = await prisma.user.findUnique({ where: { id: userId } })
-  const finalBalance = updatedUser?.credits ?? BONUS
+    const updatedUser = await tx.user.findUnique({ where: { id: userId } })
+    const balance = updatedUser?.credits ?? BONUS
 
-  await prisma.creditTransaction.create({
-    data: {
-      userId,
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount: BONUS,
+        balance,
+        type: 'admin_adjust',
+        description: 'Admin-approved welcome bonus (2 free credits)',
+      },
+    })
+
+    await writeAudit(tx, adminUser, 'grant_free_credits', 'User', userId, {
       amount: BONUS,
-      balance: finalBalance,
-      type: 'admin_adjust',
-      description: 'Admin-approved welcome bonus (2 free credits)',
-    },
+      newBalance: balance,
+    })
+
+    return balance
   })
 
   return { newBalance: finalBalance }
@@ -512,14 +738,26 @@ type AdminCreateCreditPackageInput = {
 }
 
 export const adminCreateCreditPackage: AdminCreateCreditPackage<AdminCreateCreditPackageInput, any> = async (
-  { packageId, name, credits, priceLKR, badge, isPopular = false, isActive = true, sortOrder = 0, description },
+  rawArgs,
   context
 ) => {
   requireAdmin(context)
-  if (!packageId?.trim()) throw new HttpError(400, 'Package ID is required')
-  if (!name?.trim())      throw new HttpError(400, 'Name is required')
-  if (!credits || credits <= 0) throw new HttpError(400, 'Credits must be greater than 0')
-  if (!priceLKR || priceLKR <= 0) throw new HttpError(400, 'Price must be greater than 0')
+  const {
+    packageId,
+    name,
+    credits,
+    priceLKR,
+    badge,
+    isPopular = false,
+    isActive = true,
+    sortOrder = 0,
+    description,
+  } = ensureArgsSchemaOrThrowHttpError(adminCreateCreditPackageSchema, rawArgs)
+
+  if (!packageId.trim()) throw new HttpError(400, 'Package ID is required')
+  if (!name.trim()) throw new HttpError(400, 'Name is required')
+  if (credits <= 0) throw new HttpError(400, 'Credits must be greater than 0')
+  if (priceLKR <= 0) throw new HttpError(400, 'Price must be greater than 0')
 
   const existing = await prisma.creditPackage.findUnique({ where: { packageId } })
   if (existing) throw new HttpError(400, `Package ID "${packageId}" already exists`)
@@ -538,6 +776,13 @@ export const adminCreateCreditPackage: AdminCreateCreditPackage<AdminCreateCredi
     },
   })
   invalidatePackagesCache()
+
+  await writeAudit(prisma, context.user!, 'create_credit_package', 'CreditPackage', pkg.id, {
+    packageId: pkg.packageId,
+    credits: pkg.credits,
+    priceLKR: pkg.priceLKR,
+  })
+
   return pkg
 }
 
@@ -554,26 +799,51 @@ type AdminUpdateCreditPackageInput = {
 }
 
 export const adminUpdateCreditPackage: AdminUpdateCreditPackage<AdminUpdateCreditPackageInput, any> = async (
-  { id, name, credits, priceLKR, badge, isPopular, isActive, sortOrder, description },
+  rawArgs,
   context
 ) => {
   requireAdmin(context)
-  if (!id) throw new HttpError(400, 'Package ID required')
+  const { id, name, credits, priceLKR, badge, isPopular, isActive, sortOrder, description } =
+    ensureArgsSchemaOrThrowHttpError(adminUpdateCreditPackageSchema, rawArgs)
+
   if (credits !== undefined && credits <= 0) throw new HttpError(400, 'Credits must be greater than 0')
   if (priceLKR !== undefined && priceLKR <= 0) throw new HttpError(400, 'Price must be greater than 0')
 
+  const existing = await prisma.creditPackage.findUnique({ where: { id } })
+  if (!existing) throw new HttpError(404, 'Package not found')
+
   const data: any = {}
-  if (name        !== undefined) data.name        = name.trim()
-  if (credits     !== undefined) data.credits     = credits
-  if (priceLKR    !== undefined) data.priceLKR    = priceLKR
-  if (badge       !== undefined) data.badge       = badge?.trim() || null
-  if (isPopular   !== undefined) data.isPopular   = isPopular
-  if (isActive    !== undefined) data.isActive    = isActive
-  if (sortOrder   !== undefined) data.sortOrder   = sortOrder
+  if (name !== undefined) data.name = name.trim()
+  if (credits !== undefined) data.credits = credits
+  if (priceLKR !== undefined) data.priceLKR = priceLKR
+  if (badge !== undefined) data.badge = badge?.trim() || null
+  if (isPopular !== undefined) data.isPopular = isPopular
+  if (isActive !== undefined) data.isActive = isActive
+  if (sortOrder !== undefined) data.sortOrder = sortOrder
   if (description !== undefined) data.description = description?.trim() || null
 
   const pkg = await prisma.creditPackage.update({ where: { id }, data })
   invalidatePackagesCache()
+
+  await writeAudit(prisma, context.user!, 'update_credit_package', 'CreditPackage', id, {
+    before: {
+      name: existing.name,
+      credits: existing.credits,
+      priceLKR: existing.priceLKR,
+      isActive: existing.isActive,
+      isPopular: existing.isPopular,
+      sortOrder: existing.sortOrder,
+    },
+    after: {
+      name: pkg.name,
+      credits: pkg.credits,
+      priceLKR: pkg.priceLKR,
+      isActive: pkg.isActive,
+      isPopular: pkg.isPopular,
+      sortOrder: pkg.sortOrder,
+    },
+  })
+
   return pkg
 }
 
@@ -589,6 +859,12 @@ export const adminDeleteCreditPackage: AdminDeleteCreditPackage<{ id: string }, 
 
   await prisma.creditPackage.delete({ where: { id } })
   invalidatePackagesCache()
+
+  await writeAudit(prisma, context.user!, 'delete_credit_package', 'CreditPackage', id, {
+    packageId: pkg.packageId,
+    name: pkg.name,
+  })
+
   return { success: true }
 }
 
@@ -606,13 +882,24 @@ export const adminDeleteUser: AdminDeleteUser<{ userId: string }, { success: boo
   if (!user) throw new HttpError(404, 'User not found')
   if (user.isAdmin) throw new HttpError(400, 'Cannot delete an admin account')
 
-  // Delete related records before the user (no cascade defined on these)
-  await prisma.contactFormMessage.deleteMany({ where: { userId } })
-  await prisma.creditTransaction.deleteMany({ where: { userId } })
-  await prisma.payment.deleteMany({ where: { userId } })
-  await prisma.download.deleteMany({ where: { userId } })
-  // Auth → AuthIdentity → Session cascade automatically via schema onDelete: Cascade
-  await prisma.user.delete({ where: { id: userId } })
+  const adminUser = context.user!
+
+  await prisma.$transaction(async (tx) => {
+    // Related records first (no FK cascade on these). PhoneOtp has userId without relation.
+    await tx.contactFormMessage.deleteMany({ where: { userId } })
+    await tx.creditTransaction.deleteMany({ where: { userId } })
+    await tx.payment.deleteMany({ where: { userId } })
+    await tx.download.deleteMany({ where: { userId } })
+    await tx.phoneOtp.deleteMany({ where: { userId } })
+
+    // Auth → AuthIdentity → Session cascade via schema onDelete: Cascade
+    await tx.user.delete({ where: { id: userId } })
+
+    await writeAudit(tx, adminUser, 'delete_user', 'User', userId, {
+      email: user.email,
+      username: user.username,
+    })
+  })
 
   return { success: true }
 }

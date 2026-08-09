@@ -2,14 +2,17 @@ import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "../components/ui/toast";
 
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_LIMIT = 3;
+const TOAST_REMOVE_DELAY = 6000;
+const TOAST_REMOVE_DELAY_DESTRUCTIVE = 8000;
 
 type ToasterToast = ToastProps & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+  /** Auto-dismiss duration in ms; 0 = no auto-dismiss */
+  duration?: number;
 };
 
 const actionTypes = {
@@ -52,7 +55,42 @@ interface State {
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
-const addToRemoveQueue = (toastId: string) => {
+function isDestructive(t: ToasterToast): boolean {
+  return t.variant === "destructive";
+}
+
+/**
+ * When over limit: drop oldest non-destructive first; only drop destructive
+ * toasts when every visible toast is destructive.
+ */
+function applyToastLimit(toasts: ToasterToast[]): ToasterToast[] {
+  if (toasts.length <= TOAST_LIMIT) return toasts;
+
+  const next = [...toasts];
+  while (next.length > TOAST_LIMIT) {
+    // Prefer removing the oldest non-destructive (end of array is oldest
+    // once we prepend newest — we store newest first)
+    let removeIdx = -1;
+    for (let i = next.length - 1; i >= 0; i--) {
+      if (!isDestructive(next[i])) {
+        removeIdx = i;
+        break;
+      }
+    }
+    if (removeIdx === -1) {
+      // All destructive — drop oldest (last)
+      removeIdx = next.length - 1;
+    }
+    const removed = next.splice(removeIdx, 1)[0];
+    if (removed && toastTimeouts.has(removed.id)) {
+      clearTimeout(toastTimeouts.get(removed.id));
+      toastTimeouts.delete(removed.id);
+    }
+  }
+  return next;
+}
+
+const addToRemoveQueue = (toastId: string, delay: number = TOAST_REMOVE_DELAY) => {
   if (toastTimeouts.has(toastId)) {
     return;
   }
@@ -63,7 +101,7 @@ const addToRemoveQueue = (toastId: string) => {
       type: "REMOVE_TOAST",
       toastId: toastId,
     });
-  }, TOAST_REMOVE_DELAY);
+  }, delay);
 
   toastTimeouts.set(toastId, timeout);
 };
@@ -73,7 +111,7 @@ export const reducer = (state: State, action: Action): State => {
     case "ADD_TOAST":
       return {
         ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+        toasts: applyToastLimit([action.toast, ...state.toasts]),
       };
 
     case "UPDATE_TOAST":
@@ -87,13 +125,23 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // Clear any pending auto-dismiss timer so we don't double-fire
+      const clearTimer = (id: string) => {
+        const t = toastTimeouts.get(id);
+        if (t) {
+          clearTimeout(t);
+          toastTimeouts.delete(id);
+        }
+      };
+
       if (toastId) {
-        addToRemoveQueue(toastId);
+        clearTimer(toastId);
+        // Short delay for exit animation, then hard-remove from state
+        addToRemoveQueue(toastId, 350);
       } else {
         state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id);
+          clearTimer(toast.id);
+          addToRemoveQueue(toast.id, 350);
         });
       }
 
@@ -136,7 +184,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -146,17 +194,34 @@ function toast({ ...props }: Toast) {
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
+  const resolvedDuration =
+    duration !== undefined
+      ? duration
+      : props.variant === "destructive"
+        ? TOAST_REMOVE_DELAY_DESTRUCTIVE
+        : TOAST_REMOVE_DELAY;
+
   dispatch({
     type: "ADD_TOAST",
     toast: {
       ...props,
       id,
+      duration: resolvedDuration,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss();
       },
     },
   });
+
+  // Auto-dismiss after duration (0 = sticky). DISMISS_TOAST queues removal for exit animation.
+  if (resolvedDuration > 0) {
+    const timeout = setTimeout(() => {
+      toastTimeouts.delete(id);
+      dispatch({ type: "DISMISS_TOAST", toastId: id });
+    }, resolvedDuration);
+    toastTimeouts.set(id, timeout);
+  }
 
   return {
     id: id,

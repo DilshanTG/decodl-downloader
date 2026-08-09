@@ -11,6 +11,9 @@ import {
   AccordionTrigger,
 } from "../client/components/ui/accordion";
 import { useToast } from "../client/hooks/use-toast";
+import { useOnlineStatus } from "../client/hooks/useOnlineStatus";
+import { toFriendlyError } from "../client/lib/errorToast";
+import { ToastAction } from "../client/components/ui/toast";
 import { Button } from "../client/components/ui/button";
 import { Card, CardContent, CardHeader } from "../client/components/ui/card";
 
@@ -53,8 +56,8 @@ function ProviderLogoCard({ slug, name, minCost, maxCost }: {
   const costLabel = minCost === 0
     ? "Free"
     : minCost === maxCost
-    ? `${minCost} cr`
-    : `from ${minCost} cr`;
+    ? `${minCost}`
+    : `from ${minCost}`;
 
   return (
     <div className="flex flex-col items-center gap-3 p-4 rounded-2xl border border-border/80 bg-background/50 hover:border-primary/40 hover:bg-card hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 group">
@@ -141,9 +144,19 @@ export default function PricingPage() {
     return groups;
   })();
 
+  const isOnline = useOnlineStatus();
+
   const handleBuy = async (packageId: string) => {
     if (!user) {
       window.location.href = routes.SignupRoute.to;
+      return;
+    }
+    if (!isOnline) {
+      toast({
+        title: "You're offline",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
       return;
     }
     if (confirmPackage !== packageId) {
@@ -156,10 +169,20 @@ export default function PricingPage() {
       const { paymentUrl } = await createPayherePayment({ packageId: packageId as any });
       window.location.href = paymentUrl;
     } catch (err: any) {
+      const friendly = toFriendlyError(err);
       toast({
-        title: "Payment error",
-        description: err?.message || "Could not initiate payment. Please try again.",
+        title: friendly.title === "Something went wrong on our end" ? "Payment error" : friendly.title,
+        description: friendly.description || "Could not initiate payment. Please try again.",
         variant: "destructive",
+        action:
+          friendly.actionHref && friendly.actionLabel ? (
+            <ToastAction
+              altText={friendly.actionLabel}
+              onClick={() => { window.location.href = friendly.actionHref!; }}
+            >
+              {friendly.actionLabel}
+            </ToastAction>
+          ) : undefined,
       });
       setLoadingPackage(null);
     }
@@ -367,16 +390,20 @@ export default function PricingPage() {
                           </button>
                           <button
                             onClick={() => handleBuy(pkg.packageId)}
-                            className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95 active:scale-[0.98] transition-all duration-150 shadow-md shadow-primary/10"
+                            disabled={!isOnline}
+                            title={!isOnline ? "You're offline — reconnect to pay" : undefined}
+                            className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/95 active:scale-[0.98] transition-all duration-150 shadow-md shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Confirm & Pay
+                            {isOnline ? "Confirm & Pay" : "Offline"}
                           </button>
                         </div>
                       </div>
                     ) : (
                       <Button
                         onClick={() => handleBuy(pkg.packageId)}
-                        disabled={isLoading}
+                        disabled={isLoading || !isOnline}
+                        title={!isOnline ? "You're offline — reconnect to buy" : undefined}
+                        aria-label={!isOnline ? "Buy disabled while offline" : undefined}
                         variant={isPopular ? "default" : "outline"}
                         className="w-full py-6 rounded-2xl font-bold text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer hover:shadow-lg duration-200"
                       >
@@ -388,6 +415,8 @@ export default function PricingPage() {
                             </svg>
                             Redirecting...
                           </>
+                        ) : !isOnline ? (
+                          "Offline"
                         ) : user ? (
                           "Buy Now"
                         ) : (
@@ -421,101 +450,96 @@ export default function PricingPage() {
             ))}
           </div>
 
-          {/* Provider rates — collapsible */}
+          {/* Provider rates — always visible */}
           <div id="provider-rates" className="mb-16">
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="providers" className="border border-border rounded-2xl overflow-hidden bg-card/60 backdrop-blur-md shadow-lg transition-all duration-300">
-                <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-accent/30 transition-all group">
-                  <div className="flex items-center gap-4 text-left">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted border border-border group-hover:border-primary/30 transition-colors text-lg shadow-sm">
-                      📋
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-foreground font-heading tracking-tight">
-                        What can I download? — Credit rates by provider
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                        20+ premium providers supported · Images, vectors, icons, and HD/4K videos
-                      </p>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6 pt-4 border-t border-border/80">
-
-                  <p className="text-xs text-muted-foreground mb-6">
-                    Credit cost per download, by provider and file type.
+            <div className="border border-border rounded-2xl overflow-hidden bg-card/60 backdrop-blur-md shadow-lg">
+              <div className="px-6 py-5 flex items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted border border-border text-lg shadow-sm">
+                  📋
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground font-heading tracking-tight">
+                    What can I download? — Credit rates by provider
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                    20+ premium providers supported · Images, vectors, icons, and HD/4K videos
                   </p>
-                  {(["image", "icon", "video"] as const).map((cat) => {
-                    const rows = (pricingData as ProviderPricing[] | undefined)
-                      ?.filter(p => p.category === cat && p.slug !== "lorempicsum")
-                      .sort((a, b) => a.sortOrder - b.sortOrder);
-                    if (!rows?.length) return null;
+                </div>
+              </div>
+              <div className="px-6 pb-6 pt-4 border-t border-border/80">
+                <p className="text-xs text-muted-foreground mb-6">
+                  Credit cost per download, by provider and file type.
+                </p>
+                {(["image", "icon", "video"] as const).map((cat) => {
+                  const rows = (pricingData as ProviderPricing[] | undefined)
+                    ?.filter(p => p.category === cat && p.slug !== "lorempicsum")
+                    .sort((a, b) => a.sortOrder - b.sortOrder);
+                  if (!rows?.length) return null;
 
-                    return (
-                      <div key={cat} className="mb-8">
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            {CATEGORY_LABELS[cat]}
-                          </span>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-                        <Card className="border border-border overflow-hidden shadow-sm" variant="bento">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b border-border bg-muted/40">
-                                  <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground w-10"></th>
-                                  <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Provider</th>
-                                  <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Type / Variant</th>
-                                  <th className="text-right py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Credits</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border">
-                                {rows.map((p) => (
-                                  <tr key={`${p.slug}-${p.variant}`} className="hover:bg-accent/20 transition-colors">
-                                    <td className="py-3 px-3 sm:px-4">
-                                      <div className="w-24 sm:w-28 h-8 flex items-center justify-center bg-white rounded-lg px-2 shadow-sm border border-border/10">
-                                        <img
-                                          src={`/provider-logos/png/${p.slug}.png`}
-                                          alt={p.displayName}
-                                          className="h-6 w-full object-contain"
-                                          onError={(e) => {
-                                            const img = e.currentTarget;
-                                            if (!img.dataset.triedSvg) {
-                                              img.dataset.triedSvg = "1";
-                                              img.src = `/provider-logos/${p.slug}.svg`;
-                                            } else {
-                                              img.style.display = "none";
-                                            }
-                                          }}
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="py-3 px-3 sm:px-4 font-semibold text-foreground text-xs sm:text-sm">{p.displayName.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| Select$| HD Select$| 4K Select$/, "")}</td>
-                                    <td className="py-3 px-3 sm:px-4 text-muted-foreground capitalize text-xs sm:text-sm">
-                                      {p.variant === "normal" ? "Standard" : p.variant.replace(/_/g, "").replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                                    </td>
-                                    <td className="py-3 px-3 sm:px-4 text-right">
-                                      <span className={`inline-block font-extrabold text-xs px-2.5 py-0.5 rounded-full ${
-                                        p.creditCost === 0 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-                                        p.creditCost <= 1 ? "bg-primary/10 text-primary" :
-                                        p.creditCost <= 5 ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"
-                                      }`}>
-                                        {p.creditCost} cr
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </Card>
+                  return (
+                    <div key={cat} className="mb-8">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                          {CATEGORY_LABELS[cat]}
+                        </span>
+                        <div className="flex-1 h-px bg-border" />
                       </div>
-                    );
-                  })}
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                      <Card className="border border-border overflow-hidden shadow-sm" variant="bento">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/40">
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground w-10"></th>
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Provider</th>
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Type / Variant</th>
+                                <th className="text-right py-3 px-3 sm:px-4 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Credits</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {rows.map((p) => (
+                                <tr key={`${p.slug}-${p.variant}`} className="hover:bg-accent/20 transition-colors">
+                                  <td className="py-3 px-3 sm:px-4">
+                                    <div className="w-24 sm:w-28 h-8 flex items-center justify-center bg-white rounded-lg px-2 shadow-sm border border-border/10">
+                                      <img
+                                        src={`/provider-logos/png/${p.slug}.png`}
+                                        alt={p.displayName}
+                                        className="h-6 w-full object-contain"
+                                        onError={(e) => {
+                                          const img = e.currentTarget;
+                                          if (!img.dataset.triedSvg) {
+                                            img.dataset.triedSvg = "1";
+                                            img.src = `/provider-logos/${p.slug}.svg`;
+                                          } else {
+                                            img.style.display = "none";
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 sm:px-4 font-semibold text-foreground text-xs sm:text-sm">{p.displayName.replace(/ \(.*\)$/, "").replace(/ HD$| 4K$| Select$| HD Select$| 4K Select$/, "")}</td>
+                                  <td className="py-3 px-3 sm:px-4 text-muted-foreground capitalize text-xs sm:text-sm">
+                                    {p.variant === "normal" ? "Standard" : p.variant.replace(/_/g, "").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                  </td>
+                                  <td className="py-3 px-3 sm:px-4 text-right">
+                                    <span className={`inline-block font-extrabold text-xs px-2.5 py-0.5 rounded-full ${
+                                      p.creditCost === 0 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                                      p.creditCost <= 1 ? "bg-primary/10 text-primary" :
+                                      p.creditCost <= 5 ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"
+                                    }`}>
+                                      {p.creditCost}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* FAQ */}

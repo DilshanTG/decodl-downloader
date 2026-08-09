@@ -87,9 +87,11 @@ app stockmart {
 
   client: {
     rootComponent: import App from "@src/client/App",
+    setupFn: import { clientSetup } from "@src/client/setup",
   },
 
   server: {
+    setupFn: import { serverSetup } from "@src/server/setup",
     envValidationSchema: import { serverEnvValidationSchema } from "@src/env",
   },
 
@@ -273,6 +275,13 @@ api downloadFile {
   httpRoute: (GET, "/api/download-file/:id")
 }
 
+// Public readiness probe (DB liveness). Used by uptime monitors / Railway.
+api healthz {
+  fn: import { healthz } from "@src/server/health",
+  auth: false,
+  httpRoute: (GET, "/healthz")
+}
+
 
 // ─── Background Jobs ──────────────────────────────────────────────────────────
 
@@ -313,6 +322,19 @@ job expireOldDownloads {
     cron: "0 0 * * *"
   },
   entities: [Download]
+}
+
+// Nightly: heal orphaned reservedCredits and alert on live drift (03:00 UTC).
+// Invariant: User.reservedCredits == SUM(creditsCharged) over pending|processing downloads.
+job reconcileReservedCredits {
+  executor: PgBoss,
+  perform: {
+    fn: import { reconcileReservedCredits } from "@src/downloads/jobs"
+  },
+  schedule: {
+    cron: "0 3 * * *"
+  },
+  entities: [User, Download, CreditTransaction]
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -360,17 +382,17 @@ query adminGetAllCreditTransactions {
 
 action adminAdjustUserCredits {
   fn: import { adminAdjustUserCredits } from "@src/admin/operations",
-  entities: [User, CreditTransaction]
+  entities: [User, CreditTransaction, AdminAuditLog]
 }
 
 action adminUpdateProviderPricing {
   fn: import { adminUpdateProviderPricing } from "@src/admin/operations",
-  entities: [ProviderPricing]
+  entities: [ProviderPricing, AdminAuditLog]
 }
 
 action adminForceRetryDownload {
   fn: import { adminForceRetryDownload } from "@src/admin/operations",
-  entities: [Download]
+  entities: [Download, AdminAuditLog]
 }
 
 query adminGetFailedDownloads {
@@ -380,12 +402,12 @@ query adminGetFailedDownloads {
 
 action adminSendPasswordReset {
   fn: import { adminSendPasswordReset } from "@src/admin/operations",
-  entities: [User]
+  entities: [User, AdminAuditLog]
 }
 
 action adminGrantFreeCredits {
   fn: import { adminGrantFreeCredits } from "@src/admin/operations",
-  entities: [User, CreditTransaction]
+  entities: [User, CreditTransaction, AdminAuditLog]
 }
 
 query adminGetCreditPackages {
@@ -395,22 +417,27 @@ query adminGetCreditPackages {
 
 action adminCreateCreditPackage {
   fn: import { adminCreateCreditPackage } from "@src/admin/operations",
-  entities: [CreditPackage]
+  entities: [CreditPackage, AdminAuditLog]
 }
 
 action adminUpdateCreditPackage {
   fn: import { adminUpdateCreditPackage } from "@src/admin/operations",
-  entities: [CreditPackage]
+  entities: [CreditPackage, AdminAuditLog]
 }
 
 action adminDeleteCreditPackage {
   fn: import { adminDeleteCreditPackage } from "@src/admin/operations",
-  entities: [CreditPackage]
+  entities: [CreditPackage, AdminAuditLog]
 }
 
 action adminDeleteUser {
   fn: import { adminDeleteUser } from "@src/admin/operations",
-  entities: [User, Download, Payment, CreditTransaction, ContactFormMessage]
+  entities: [User, Download, Payment, CreditTransaction, ContactFormMessage, PhoneOtp, AdminAuditLog]
+}
+
+query adminGetSystemHealth {
+  fn: import { adminGetSystemHealth } from "@src/admin/operations",
+  entities: [AdminAuditLog, Payment, Download]
 }
 
 route AdminRoute { path: "/admin", to: AnalyticsDashboardPage }
@@ -465,6 +492,12 @@ route AdminFailedDownloadsRoute { path: "/admin/failed-downloads", to: AdminFail
 page AdminFailedDownloadsPage {
   authRequired: true,
   component: import AdminFailedDownloadsPage from "@src/admin/dashboards/downloads/AdminFailedDownloadsPage"
+}
+
+route AdminSystemHealthRoute { path: "/admin/system-health", to: AdminSystemHealthPage }
+page AdminSystemHealthPage {
+  authRequired: true,
+  component: import SystemHealthPage from "@src/admin/dashboards/system/SystemHealthPage"
 }
 
 route RefundPolicyRoute { path: "/refund-policy", to: RefundPolicyPage }

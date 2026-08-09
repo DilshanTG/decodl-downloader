@@ -1,5 +1,5 @@
 import { type GetProviderPricing, type GetMyTransactions, type GetMyCreditBalance, type ClaimSignupBonus } from 'wasp/server/operations'
-import { HttpError } from 'wasp/server'
+import { HttpError, prisma } from 'wasp/server'
 
 // ─── Fix 1: Provider pricing cache (5-min TTL) ────────────────────────────────
 // Eliminates repeated DB hits for the most-read query in the app.
@@ -57,6 +57,62 @@ const SYNC_COOLDOWN_MS   = 2 * 60 * 1000  // don't re-check same payment within 
 const SYNC_MAX_AGE_MS    = 30 * 60 * 1000 // stop checking after 30 min (stale = cancelled)
 const DIGIMART_BASE      = 'https://pay.digimartsolutions.lk'
 
+/**
+ * Atomic claim → credit → ledger for a pending payment (sync path).
+ * Returns true if this call granted credits; false if already processed.
+ */
+async function claimAndCreditPendingPayment(payment: {
+  id: string
+  userId: string
+  creditsAwarded: number
+  amountLKR: number
+  payhereOrderId: string
+}): Promise<boolean> {
+  return await prisma.$transaction(async (tx) => {
+    const syncClaimed = await tx.payment.updateMany({
+      where: { id: payment.id, status: 'pending' },
+      data: { status: 'paid', updatedAt: new Date() },
+    })
+    if (syncClaimed.count === 0) return false
+
+    const updatedUser = await tx.user.update({
+      where: { id: payment.userId },
+      data: {
+        credits: { increment: payment.creditsAwarded },
+        lifetimeCreditsEarned: { increment: payment.creditsAwarded },
+        lifetimeSpentLKR: { increment: payment.amountLKR },
+      },
+    })
+
+    await tx.creditTransaction.create({
+      data: {
+        userId: payment.userId,
+        amount: payment.creditsAwarded,
+        balance: updatedUser.credits,
+        type: 'purchase',
+        reference: payment.id,
+        description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Sync: ${payment.payhereOrderId})`,
+      },
+    })
+
+    return true
+  })
+}
+
+async function fetchGatewayStatus(orderId: string, merchantKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${DIGIMART_BASE}/api/v1/status/${orderId}`, {
+      headers: { Authorization: `Bearer ${merchantKey}` },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    const body = await res.json() as { status: string; data: { status: string } }
+    return body?.data?.status ?? null
+  } catch {
+    return null
+  }
+}
+
 export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; reservedCredits: number; available: number }> = async (_args, context) => {
   if (!context.user) throw new HttpError(401)
 
@@ -74,65 +130,59 @@ export const getMyCreditBalance: GetMyCreditBalance<void, { credits: number; res
       const updatedMs = Date.now() - new Date(payment.updatedAt).getTime()
 
       if (ageMs > SYNC_MAX_AGE_MS) {
-        await context.entities.Payment.update({
-          where: { id: payment.id },
+        // Final gateway check before auto-cancel — a delayed SUCCESS must still credit
+        const apiStatus = await fetchGatewayStatus(payment.payhereOrderId, merchantKey)
+        if (apiStatus === 'SUCCESS') {
+          const credited = await claimAndCreditPendingPayment(payment)
+          if (credited) {
+            console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${userId} (stale-window SUCCESS)`)
+          }
+          return
+        }
+
+        const cancelled = await prisma.payment.updateMany({
+          where: { id: payment.id, status: 'pending' },
           data: { status: 'cancelled', updatedAt: new Date() },
         })
+        if (cancelled.count === 0) {
+          console.log(`[Balance sync] skipped stale cancel for payment ${payment.id} — no longer pending`)
+        }
         return
       }
+
       const isNeverChecked = Math.abs(payment.updatedAt.getTime() - payment.createdAt.getTime()) < 5000
       if (!isNeverChecked && updatedMs < SYNC_COOLDOWN_MS) return
 
       try {
-        const res = await fetch(`${DIGIMART_BASE}/api/v1/status/${payment.payhereOrderId}`, {
-          headers: { Authorization: `Bearer ${merchantKey}` },
-          signal: AbortSignal.timeout(5000),
-        })
-
-        if (!res.ok) return
-
-        const body      = await res.json() as { status: string; data: { status: string } }
-        const apiStatus = body?.data?.status ?? null
+        const apiStatus = await fetchGatewayStatus(payment.payhereOrderId, merchantKey)
+        if (!apiStatus) return
 
         if (apiStatus === 'SUCCESS') {
-          const syncClaimed = await context.entities.Payment.updateMany({
-            where: { id: payment.id, status: 'pending' },
-            data: { status: 'paid', updatedAt: new Date() },
-          })
-          if (syncClaimed.count === 0) return
-
-          const updatedUser = await context.entities.User.update({
-            where: { id: userId },
-            data: {
-              credits: { increment: payment.creditsAwarded },
-              lifetimeCreditsEarned: { increment: payment.creditsAwarded },
-              lifetimeSpentLKR: { increment: payment.amountLKR },
-            },
-          })
-
-          await context.entities.CreditTransaction.create({
-            data: {
-              userId,
-              amount: payment.creditsAwarded,
-              balance: updatedUser.credits,
-              type: 'purchase',
-              reference: payment.id,
-              description: `Purchased ${payment.creditsAwarded} credits — Rs. ${payment.amountLKR.toLocaleString()} (Sync: ${payment.payhereOrderId})`,
-            },
-          })
-
-          console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${userId}`)
+          const credited = await claimAndCreditPendingPayment(payment)
+          if (credited) {
+            console.log(`[Balance sync] Credited ${payment.creditsAwarded} credits to user ${userId}`)
+          }
 
         } else if (apiStatus === 'FAILED' || apiStatus === 'CANCELLED') {
-          await context.entities.Payment.update({
-            where: { id: payment.id },
-            data: { status: apiStatus === 'FAILED' ? 'failed' : 'cancelled', updatedAt: new Date() },
+          const updated = await prisma.payment.updateMany({
+            where: { id: payment.id, status: 'pending' },
+            data: {
+              status: apiStatus === 'FAILED' ? 'failed' : 'cancelled',
+              updatedAt: new Date(),
+            },
           })
+          if (updated.count === 0) {
+            console.log(`[Balance sync] skipped ${apiStatus} write for payment ${payment.id} — no longer pending`)
+          }
         } else {
-          await context.entities.Payment.update({
-            where: { id: payment.id },
+          // Touch updatedAt for cooldown — only if still pending (never overwrite paid/terminal)
+          const touched = await prisma.payment.updateMany({
+            where: { id: payment.id, status: 'pending' },
             data: { updatedAt: new Date() },
           })
+          if (touched.count === 0) {
+            console.log(`[Balance sync] skipped touch for payment ${payment.id} — no longer pending`)
+          }
         }
       } catch (err) {
         console.error('[Balance sync] DigiMart status check failed:', err)

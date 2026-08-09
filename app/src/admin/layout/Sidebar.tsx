@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   ChevronDown,
   ChevronUp,
@@ -26,6 +27,7 @@ interface SidebarProps {
 
 const NAV_LINKS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/system-health", label: "System Health", icon: Activity, end: true },
   { to: "/admin/users", label: "Users", icon: Users, end: true },
   { to: "/admin/downloads", label: "Downloads", icon: Download, end: true },
   { to: "/admin/failed-downloads", label: "Failed Downloads", icon: AlertTriangle, end: true },

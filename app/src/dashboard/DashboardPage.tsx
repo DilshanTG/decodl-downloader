@@ -17,6 +17,9 @@ import { routes } from "wasp/client/router";
 import { DOWNLOAD_STATUS_COLORS, DOWNLOAD_STATUS_LABELS } from "../shared/constants";
 import { groupDownloads, getBatchStatusText } from "../shared/grouping";
 import { useToast } from "../client/hooks/use-toast";
+import { useOnlineStatus } from "../client/hooks/useOnlineStatus";
+import { toFriendlyError } from "../client/lib/errorToast";
+import { ToastAction } from "../client/components/ui/toast";
 import type { ProviderPricing } from "wasp/entities";
 import { Button } from "../client/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../client/components/ui/card";
@@ -54,46 +57,28 @@ function detectProvider(url: string): string | null {
 
 const TERMINAL_STATUSES = new Set(["completed","failed","refunded"]);
 
-// Reuse single AudioContext — creating one per call leaks memory
-let _audioCtx: AudioContext | null = null;
-function getAudioCtx() {
-  if (!_audioCtx || _audioCtx.state === "closed") _audioCtx = new AudioContext();
-  return _audioCtx;
-}
 
-// Play a pleasant two-tone chime using Web Audio API — no external files needed
-function playChime() {
- try {
- const ctx = getAudioCtx();
- const times = [0, 0.18];
- const freqs = [1046.5, 1318.5]; // C6, E6
- times.forEach((t, i) => {
- const osc = ctx.createOscillator();
- const gain = ctx.createGain();
- osc.connect(gain);
- gain.connect(ctx.destination);
- osc.type = "sine";
- osc.frequency.value = freqs[i];
- gain.gain.setValueAtTime(0, ctx.currentTime + t);
- gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
- gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.6);
- osc.start(ctx.currentTime + t);
- osc.stop(ctx.currentTime + t + 0.6);
- });
- } catch {}
-}
-
-// Show browser notification — only if user has already granted permission (never auto-request)
-async function showNotification(title: string, body: string) {
- if (!("Notification"in window)) return;
- if (Notification.permission !== "granted") return;
- new Notification(title, {
- body,
- icon: "/stockmart-logo.svg",
- badge: "/stockmart-logo.svg",
- silent: true,
+/** Build a toast from toFriendlyError, with optional action link */
+function toastFromError(toast: ReturnType<typeof useToast>["toast"], err: unknown) {
+ const friendly = toFriendlyError(err);
+ toast({
+ title: friendly.title,
+ description: friendly.description,
+ variant: friendly.variant,
+ action:
+ friendly.actionHref && friendly.actionLabel ? (
+ <ToastAction
+ altText={friendly.actionLabel}
+ onClick={() => {
+ window.location.href = friendly.actionHref!;
+ }}
+ >
+ {friendly.actionLabel}
+ </ToastAction>
+ ) : undefined,
  });
 }
+
 
 function SkeletonRow() {
  return (
@@ -109,11 +94,18 @@ function SkeletonRow() {
 export default function DashboardPage() {
  const { data: user } = useAuth();
  const { toast } = useToast();
+ const isOnline = useOnlineStatus();
 
  const [url, setUrl] = useState("");
  const [manuallySelectedProvider, setManuallySelectedProvider] = useState("");
  const [selectedVariant, setSelectedVariant] = useState("normal");
  const [isSubmitting, setIsSubmitting] = useState(false);
+ const submitInFlightRef = useRef(false);
+ const bulkInFlightRef = useRef(false);
+ const paymentReconcileRan = useRef(false);
+ const justCompletedTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+ const [balanceUpdating, setBalanceUpdating] = useState(false);
+ const duplicateBannerRef = useRef<HTMLDivElement>(null);
  const [isClaimingBonus, setIsClaimingBonus] = useState(false);
  const [otpStep, setOtpStep] = useState<'idle' | 'sent' | 'verified'>('idle');
  const [otpCode, setOtpCode] = useState('');
@@ -153,13 +145,7 @@ export default function DashboardPage() {
  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
  // Track previous statuses to detect transitions → completed/failed
  const prevStatusesRef = useRef<Record<string, string>>({});
- // In-site notifications
- const [notifications, setNotifications] = useState<Array<{
- id: string; type: "success"|"error"; title: string; body: string; read: boolean; ts: number;
- }>>([]);
- const [notifOpen, setNotifOpen] = useState(false);
  const [duplicateWarning, setDuplicateWarning] = useState(false);
- const unreadCount = notifications.filter(n => !n.read).length;
 
  const {
  data: downloadsData,
@@ -176,24 +162,77 @@ export default function DashboardPage() {
  const { data: pricingData } = useQuery(getProviderPricing, undefined, { staleTime: 5 * 60 * 1000 });
  const { data: decodlBalanceData } = useQuery(getDecodlBalance, undefined, { staleTime: 2 * 60 * 1000 });
 
- // Removed unconditional admin redirect so admins can view the dashboard too.
+ // Clear justCompleted animation timers on unmount
+ useEffect(() => {
+ return () => {
+ justCompletedTimeoutsRef.current.forEach(clearTimeout);
+ justCompletedTimeoutsRef.current = [];
+ };
+ }, []);
 
+ // Post-PayHere success: toast + accelerated balance reconciliation
  useEffect(() => {
  const params = new URLSearchParams(window.location.search);
  const payment = params.get("payment");
- if (payment === "success") {
- toast({
- title: "Payment successful!",
- description: "Your credits have been added. It may take a moment to reflect.",
- });
- } else if (payment === "failed") {
+ if (!payment) return;
+
+ if (payment === "failed") {
  toast({
  title: "Payment failed",
  description: "Your payment could not be processed. No charges were made. Try again from the Pricing page.",
  variant: "destructive",
  });
+ window.history.replaceState({}, "", window.location.pathname);
+ return;
  }
- if (payment) window.history.replaceState({},"", window.location.pathname);
+
+ if (payment !== "success") return;
+ if (paymentReconcileRan.current) {
+ window.history.replaceState({}, "", window.location.pathname);
+ return;
+ }
+ paymentReconcileRan.current = true;
+
+ toast({
+ title: "Payment successful!",
+ description: "Your credits have been added. Updating your balance…",
+ });
+ window.history.replaceState({}, "", window.location.pathname);
+
+ const baseline = balanceData?.available ?? balanceData?.credits ?? 0;
+ setBalanceUpdating(true);
+ let cancelled = false;
+ let resolved = false;
+
+ const tryRefetch = async (isLast: boolean) => {
+ if (cancelled || resolved) return;
+ try {
+ const result = await refetchBalance();
+ const data = (result as any)?.data;
+ const current = data?.available ?? data?.credits;
+ if (typeof current === "number" && current > baseline) {
+ resolved = true;
+ setBalanceUpdating(false);
+ return;
+ }
+ } catch {
+ /* ignore transient refetch errors */
+ }
+ if (isLast && !cancelled) setBalanceUpdating(false);
+ };
+
+ void tryRefetch(false);
+ const t1 = setTimeout(() => void tryRefetch(false), 3000);
+ const t2 = setTimeout(() => void tryRefetch(false), 6000);
+ const t3 = setTimeout(() => void tryRefetch(true), 12000);
+
+ return () => {
+ cancelled = true;
+ clearTimeout(t1);
+ clearTimeout(t2);
+ clearTimeout(t3);
+ };
+ // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for ?payment=
  }, []);
 
  useEffect(() => {
@@ -207,46 +246,24 @@ export default function DashboardPage() {
  setPollInterval(hasActive ? 2000 : false);
  }, [downloadsData]);
 
- // Detect download status transitions → fire chime + browser + in-site notification
+ // Detect download status transitions → update justCompletedIds for row highlighting
  useEffect(() => {
  const downloads = downloadsData?.downloads ?? [];
  if (downloads.length === 0) return;
 
  const prev = prevStatusesRef.current;
- const newNotifs: typeof notifications = [];
 
  downloads.forEach((d: any) => {
  const wasActive = prev[d.id] && !TERMINAL_STATUSES.has(prev[d.id]);
  if (wasActive && d.status === "completed") {
- playChime();
- showNotification("✅ Download Ready!", `${d.providerSlug} — your file is ready.`);
- newNotifs.push({
- id: `${d.id}-done`,
- type: "success",
- title: "Download Ready!",
- body: `${d.providerSlug} — click to download.`,
- read: false,
- ts: Date.now(),
- });
  setJustCompletedIds(prev => new Set([...prev, d.id]));
- setTimeout(() => setJustCompletedIds(prev => { const n = new Set(prev); n.delete(d.id); return n; }), 8000);
- }
- if (wasActive && d.status === "failed") {
- showNotification("❌ Download Failed", `${d.providerSlug} — credits refunded.`);
- newNotifs.push({
- id: `${d.id}-fail`,
- type: "error",
- title: "Download Failed",
- body: `${d.providerSlug} — credits refunded automatically.`,
- read: false,
- ts: Date.now(),
- });
+ const tid = setTimeout(() => {
+ setJustCompletedIds(prev => { const n = new Set(prev); n.delete(d.id); return n; });
+ justCompletedTimeoutsRef.current = justCompletedTimeoutsRef.current.filter(x => x !== tid);
+ }, 8000);
+ justCompletedTimeoutsRef.current.push(tid);
  }
  });
-
- if (newNotifs.length > 0) {
- setNotifications(prev => [...newNotifs, ...prev].slice(0, 20));
- }
 
  const next: Record<string, string> = {};
  downloads.forEach((d: any) => { next[d.id] = d.status; });
@@ -346,9 +363,20 @@ export default function DashboardPage() {
  const handleBulkSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
  if (!bulkUrls.trim()) return;
+ if (!isOnline) {
+ toast({
+ title: "You're offline",
+ description: "Please check your connection and try again.",
+ variant: "destructive",
+ });
+ return;
+ }
+ if (bulkInFlightRef.current) return;
+ bulkInFlightRef.current = true;
 
  const lines = bulkUrls.split("\n").map(l => l.trim()).filter(Boolean);
  if (lines.length > 5) {
+ bulkInFlightRef.current = false;
  toast({
  title: "Limit Exceeded",
  description: "You can only submit up to 5 links at a time in bulk download.",
@@ -371,6 +399,7 @@ export default function DashboardPage() {
  }).filter(item => !!item.slug);
 
  if (validLines.length === 0) {
+ bulkInFlightRef.current = false;
  toast({
  title: "No supported links found",
  description: "Please check your links. Paste full URLs from Shutterstock, Freepik, Adobe Stock, or other supported sites.",
@@ -381,10 +410,16 @@ export default function DashboardPage() {
 
  const totalCost = validLines.reduce((sum, item) => sum + item.cost, 0);
  if (creditBalance < totalCost) {
+ bulkInFlightRef.current = false;
  toast({
- title: "Insufficient credits",
+ title: "Not enough credits",
  description: `Your balance is ${creditBalance.toFixed(1)} credits, but this bulk batch requires ${totalCost.toFixed(1)} credits.`,
  variant: "destructive",
+ action: (
+ <ToastAction altText="Buy Credits" onClick={() => { window.location.href = routes.PricingPageRoute.to; }}>
+ Buy Credits
+ </ToastAction>
+ ),
  });
  return;
  }
@@ -394,6 +429,7 @@ export default function DashboardPage() {
  let failCount = 0;
  const batchId = `bulk-batch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+ try {
  for (let i = 0; i < validLines.length; i++) {
  const item = validLines[i];
  try {
@@ -424,27 +460,45 @@ export default function DashboardPage() {
  } catch (err: any) {
  console.error(`Failed to submit bulk download for: ${item.line}`, err);
  failCount++;
+ if (i === 0 && successCount === 0) {
+ toastFromError(toast, err);
+ }
  }
  }
 
  setBulkUrls("");
- setBulkSubmitting(false);
  setPollInterval(2000);
  refetchDownloads();
  refetchBalance();
  setTimeout(() => downloadsRef.current?.scrollIntoView({ behavior: "smooth", block: "start"}), 300);
 
+ if (successCount > 0) {
  toast({
  title: "✅ Batch submitted!",
  description: `${successCount} file${successCount !== 1 ? 's' : ''} queued — usually ready in 1–3 minutes. Scroll down to 'Recent Downloads' to track progress and save your files.${
  failCount > 0 ? ` (${failCount} could not be submitted.)` : ""
  }`,
  });
+ }
+ } finally {
+ setBulkSubmitting(false);
+ bulkInFlightRef.current = false;
+ }
  };
 
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
  if (!url.trim()) return;
+ if (!isOnline) {
+ toast({
+ title: "You're offline",
+ description: "Please check your connection and try again.",
+ variant: "destructive",
+ });
+ return;
+ }
+ // Sync in-flight guard — closes the render lag window of the disabled prop
+ if (submitInFlightRef.current) return;
  if (!detectedSlug) {
  toast({
  title: isUrlMode ?"Unsupported URL": "No Provider Selected",
@@ -461,9 +515,17 @@ export default function DashboardPage() {
  const isDuplicate = recentDownloads.some((d: any) => d.link === trimmedUrl || d.code === trimmedUrl);
  if (isDuplicate && !duplicateWarning) {
  setDuplicateWarning(true);
+ toast({
+ title: "Already downloaded recently",
+ description: "This URL was downloaded before. Click \"Download Anyway\" to charge credits again.",
+ });
+ requestAnimationFrame(() => {
+ duplicateBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+ });
  return;
  }
  setDuplicateWarning(false);
+ submitInFlightRef.current = true;
  setIsSubmitting(true);
  try {
  if (isUrlMode) {
@@ -494,13 +556,10 @@ export default function DashboardPage() {
  description: "Preparing your file — usually 30–90 seconds. Scrolling down so you can see it when it's ready.",
  });
  } catch (err: any) {
- toast({
- title: "Download failed",
- description: err?.message ||"Something went wrong. Please try again.",
- variant: "destructive",
- });
+ toastFromError(toast, err);
  } finally {
  setIsSubmitting(false);
+ submitInFlightRef.current = false;
  }
  };
 
@@ -590,58 +649,6 @@ export default function DashboardPage() {
  Download premium images, videos &amp; icons from 20+ sites · Pay in LKR
  </p>
  </div>
- <div className= "flex items-center gap-3 shrink-0">
- {/* Notification bell */}
- <div className= "relative">
- <button
- onClick={() => { setNotifOpen(o => !o); setNotifications(n => n.map(x => ({ ...x, read: true }))); }}
- className= "relative p-2 rounded-xl hover:bg-white/10 transition-colors"
- aria-label= "Notifications"
- >
- <svg className= "w-5 h-5 text-white/80"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2} d= "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
- </svg>
- {unreadCount > 0 && (
- <span className= "absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-secondary text-[10px] font-black text-white flex items-center justify-center duration-200">
- {unreadCount > 9 ?"9+": unreadCount}
- </span>
- )}
- </button>
-
- {/* Dropdown */}
- {notifOpen && (
- <div className= "absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl shadow-black/20 z-50 overflow-hidden duration-200">
- <div className= "flex items-center justify-between px-4 py-3 border-b border-border">
- <span className= "text-sm font-bold text-foreground">Notifications</span>
- {notifications.length > 0 && (
- <button onClick={() => setNotifications([])} className= "text-xs text-muted-foreground hover:text-foreground transition-colors">
- Clear all
- </button>
- )}
- </div>
- <div className= "max-h-72 overflow-y-auto">
- {notifications.length === 0 ? (
- <div className= "py-8 text-center text-sm text-muted-foreground">No notifications yet</div>
- ) : (
- notifications.map(n => (
- <div key={n.id} className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 last:border-0 ${n.read ?"opacity-60": ""}`}>
- <span className= "text-lg mt-0.5 shrink-0">{n.type === "success"?"✅": "❌"}</span>
- <div className= "flex-1 min-w-0">
- <p className= "text-sm font-bold text-foreground">{n.title}</p>
- <p className= "text-xs text-muted-foreground mt-0.5">{n.body}</p>
- <p className= "text-[10px] text-muted-foreground/60 mt-1">
- {new Date(n.ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit"})}
- </p>
- </div>
- </div>
- ))
- )}
- </div>
- </div>
- )}
- </div>
-
- </div>
  </div>
  </div>
  </div>
@@ -659,8 +666,13 @@ export default function DashboardPage() {
  </span>
  </CardHeader>
  <CardContent>
- {balanceLoading ? (
- <div className= "animate-pulse h-12 w-24 bg-muted rounded mb-3"></div>
+ {(balanceLoading || balanceUpdating) ? (
+ <div className="mb-3">
+ <div className="animate-pulse h-12 w-24 bg-muted rounded mb-1"></div>
+ {balanceUpdating && (
+ <p className="text-xs font-semibold text-primary animate-pulse">Updating your balance…</p>
+ )}
+ </div>
  ) : (
  <div className= "text-5xl font-black text-foreground mb-1.5 tabular-nums">
  {typeof creditBalance === "number"? creditBalance.toFixed(1) : "—"}
@@ -965,16 +977,19 @@ export default function DashboardPage() {
 
  {/* Duplicate URL warning */}
  {duplicateWarning && (
- <div className= "mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 duration-200">
- <svg className= "w-4 h-4 text-amber-500 shrink-0 mt-0.5"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
- <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2.5} d= "M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+ <div
+ ref={duplicateBannerRef}
+ className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 duration-200"
+ >
+ <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
  </svg>
- <div className= "flex-1 min-w-0">
- <p className= "text-sm font-bold text-amber-600 dark:text-amber-400">You already downloaded this recently</p>
- <p className= "text-xs text-muted-foreground mt-0.5">Downloading again will charge credits. Are you sure?</p>
+ <div className="flex-1 min-w-0">
+ <p className="text-sm font-bold text-amber-600 dark:text-amber-400">You already downloaded this recently</p>
+ <p className="text-xs text-muted-foreground mt-0.5">Downloading again will charge credits. Click &quot;Download Anyway&quot; below to continue.</p>
  </div>
- <button type= "button"onClick={() => setDuplicateWarning(false)} className= "text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline shrink-0">
- Download again
+ <button type="button" onClick={() => setDuplicateWarning(false)} className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline shrink-0">
+ Dismiss
  </button>
  </div>
  )}
@@ -1087,8 +1102,14 @@ export default function DashboardPage() {
              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80 mb-0.5">Provider</p>
              {s1 === "success" && (
                <div className="flex items-center gap-2 min-w-0">
-                 <img src={`/provider-logos/${detectedSlug}.svg`} alt="" className="h-4 w-auto shrink-0 object-contain"
-                   onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                 <img
+                   src={`/provider-logos/${detectedSlug}.svg`}
+                   alt=""
+                   width={16}
+                   height={16}
+                   className="h-4 w-4 shrink-0 object-contain"
+                   onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                 />
                  <span className="text-sm font-extrabold text-foreground truncate">{providerLabel}</span>
                </div>
              )}
@@ -1272,7 +1293,9 @@ export default function DashboardPage() {
  <div className= "flex flex-col sm:flex-row gap-4 items-start sm:items-center">
  <Button
  type= "submit"
- disabled={isSubmitting || liveInfoLoading || !detectedSlug || !url.trim() || decodlShortfall}
+ disabled={isSubmitting || liveInfoLoading || !detectedSlug || !url.trim() || decodlShortfall || !isOnline}
+ title={!isOnline ? "You're offline — reconnect to download" : undefined}
+ aria-label={!isOnline ? "Download disabled while offline" : undefined}
  className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all duration-200 active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg shadow-md disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed cursor-pointer"
  >
  {isSubmitting ? (
@@ -1290,6 +1313,15 @@ export default function DashboardPage() {
  <path className= "opacity-75"fill= "currentColor"d= "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
  </svg>
  Calculating Cost...
+ </>
+ ) : !isOnline ? (
+ <>Offline</>
+ ) : duplicateWarning ? (
+ <>
+ <svg className= "w-4 h-4 mr-2"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
+ <path strokeLinecap= "round"strokeLinejoin= "round"strokeWidth={2} d= "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+ </svg>
+ Download Anyway
  </>
  ) : (
  <>
@@ -1416,7 +1448,7 @@ export default function DashboardPage() {
  <div className= "flex flex-col sm:flex-row gap-4 items-start sm:items-center">
  <Button
  type= "submit"
- disabled={bulkSubmitting || (() => {
+ disabled={bulkSubmitting || !isOnline || (() => {
  const bulkLines = bulkUrls.split("\n").map(l => l.trim()).filter(Boolean);
  const validBulkLines = bulkLines.map(line => {
  const isUrl = line.includes(".") || line.includes("/") || line.startsWith("http");
@@ -1429,6 +1461,8 @@ export default function DashboardPage() {
  }).filter(Boolean);
  return validBulkLines.length === 0;
  })()}
+ title={!isOnline ? "You're offline — reconnect to download" : undefined}
+ aria-label={!isOnline ? "Batch download disabled while offline" : undefined}
  className= "w-full sm:w-auto px-8 py-6 rounded-xl font-bold tracking-wide transition-all duration-200 active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg shadow-md disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed cursor-pointer"
  >
  {bulkSubmitting ? (
@@ -1439,6 +1473,8 @@ export default function DashboardPage() {
  </svg>
  Queuing Batch...
  </>
+ ) : !isOnline ? (
+ <>Offline</>
  ) : (
  <>
  <svg className= "w-4 h-4 mr-2"fill= "none"stroke= "currentColor"viewBox= "0 0 24 24">
@@ -1490,8 +1526,8 @@ export default function DashboardPage() {
  </CardHeader>
  <CardContent className= "p-0">
  {downloadsLoading ? (
-  <div className= "space-y-4">
-  {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
+  <div className="space-y-4" aria-busy="true" aria-label="Loading downloads">
+  {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
   </div>
   ) : recentDownloads.length === 0 ? (
   <div className="rounded-2xl border border-border/80 bg-card p-6">
@@ -1524,28 +1560,10 @@ export default function DashboardPage() {
             <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px] font-extrabold">2</span>
             <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Paste & Verify</h4>
           </div>
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
             Paste it into the search box above. Watch the 3-step panel instantly recognize the site and verify details.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setUrl("https://picsum.photos/id/237/200/300");
-            setSelectedVariant("normal");
-            setDuplicateWarning(false);
-            urlInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-            urlInputRef.current?.focus();
-            toast({
-              title: "💡 Free Demo Link pasted!",
-              description: "Look at the 3-step verification checklist above running in free Sandbox Mode!",
-            });
-          }}
-          className="w-full text-left inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline border-t border-border/30 pt-2 mt-1"
-        >
-          ⚡ Try Free Demo Link
-          <svg className="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/></svg>
-        </button>
       </div>
       
       {/* Step 3 */}
@@ -1661,40 +1679,40 @@ export default function DashboardPage() {
  return (
  <div
  key={download.id}
- className= "flex items-center gap-4 py-4 group"
+ className="flex flex-col gap-2 py-4 group sm:flex-row sm:items-center sm:gap-4"
  >
- <div className= "flex-1 min-w-0">
- <p className= "text-sm font-bold text-foreground truncate">
- {download.isBulk ?"Bulk Batch": getDisplayName(download.providerSlug)}
+ <div className="flex-1 min-w-0">
+ <p className="text-sm font-bold text-foreground truncate">
+ {download.isBulk ? "Bulk Batch" : getDisplayName(download.providerSlug)}
  {download.isBulk && (
- <span className= "ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+ <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
  {download.items.length} files
  </span>
  )}
  </p>
- <p className= "text-xs text-muted-foreground mt-0.5">
+ <p className="text-xs text-muted-foreground mt-0.5">
  {new Date(download.createdAt).toLocaleDateString("en-GB", {
  day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
  })}
  </p>
  </div>
+ <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
  <span
  key={statusInfo.text}
  className={statusInfo.colorClass}
  >
  {statusInfo.isProcessing && (
- <svg className= "animate-spin -ml-0.5 mr-1 h-3 w-3"fill= "none"viewBox= "0 0 24 24">
- <circle className= "opacity-25"cx= "12"cy= "12"r= "10"stroke= "currentColor"strokeWidth= "4"></circle>
- <path className= "opacity-75"fill= "currentColor"d= "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+ <svg className="animate-spin -ml-0.5 mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24">
+ <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+ <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
  </svg>
  )}
  {statusInfo.text}
  </span>
- <span className= "text-xs text-muted-foreground font-bold tabular-nums text-right shrink-0 whitespace-nowrap">
+ <span className="text-xs text-muted-foreground font-bold tabular-nums text-right shrink-0 whitespace-nowrap">
  {download.creditsCharged ? `${download.creditsCharged.toFixed(1)} credits` : "—"}
  </span>
- <div className= "flex gap-2 shrink-0">
- <Button size= "sm"variant= "outline"asChild className= "h-8 rounded-lg text-xs font-semibold px-3 border-border opacity-50 hover:opacity-100 transition-opacity">
+ <Button size="sm" variant="outline" asChild className="h-8 rounded-lg text-xs font-semibold px-3 border-border opacity-50 hover:opacity-100 transition-opacity shrink-0">
  <Link to={routes.DownloadDetailRoute.build({ params: { id: download.id } }) as any}>
  Details
  </Link>

@@ -58,9 +58,13 @@ model Download {
   retryCount    Int       @default(0)
   errorMessage  String?
   lastPolledAt  DateTime?
+  /// Clock for the current attempt (submit or retry). Timeouts use this, not createdAt.
+  attemptStartedAt DateTime @default(now())
   downloadToken String @default(dbgenerated("(gen_random_uuid())::text"))
 
   @@index([userId, status, createdAt])
+  @@index([status, decodlJobId])
+  @@index([userId, status])
 }
 
 model CreditTransaction {
@@ -75,6 +79,8 @@ model CreditTransaction {
   type        String    // purchase|download|refund|bonus|admin_adjust
   reference   String?
   description String?
+
+  @@index([userId, createdAt])
 }
 
 model Payment {
@@ -187,4 +193,20 @@ model ContactFormMessage {
   content   String
   isRead    Boolean  @default(false)
   repliedAt DateTime?
+}
+
+/// Append-only trail of privileged admin mutations (never store secrets or reset links).
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+
+  adminId     String
+  adminEmail  String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+
+  @@index([createdAt])
+  @@index([adminId])
 }

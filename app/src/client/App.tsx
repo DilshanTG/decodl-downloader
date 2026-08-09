@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Auto-reload when a Vite chunk fails to load after a new deployment
 if (typeof window !== "undefined") {
@@ -17,6 +17,32 @@ import {
 import CookieConsentBanner from "./components/cookie-consent/Banner";
 import Footer from "../landing-page/components/Footer";
 import { footerNavigation } from "../landing-page/contentSections";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
+
+function ScrollToTopButton() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      aria-label="Scroll to top"
+      className="fixed bottom-24 right-6 z-50 flex items-center justify-center w-[52px] h-[52px] rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-primary/30 active:scale-95"
+    >
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 15l-6-6-6 6" />
+      </svg>
+    </button>
+  );
+}
 
 function WhatsAppButton() {
   return (
@@ -33,6 +59,51 @@ function WhatsAppButton() {
       </svg>
     </a>
   );
+}
+
+function ConnectionBanner() {
+  const online = useOnlineStatus();
+  const wasOffline = useRef(false);
+  const [showBackOnline, setShowBackOnline] = useState(false);
+
+  useEffect(() => {
+    if (!online) {
+      wasOffline.current = true;
+      setShowBackOnline(false);
+      return;
+    }
+    if (wasOffline.current) {
+      setShowBackOnline(true);
+      const t = setTimeout(() => setShowBackOnline(false), 2800);
+      return () => clearTimeout(t);
+    }
+  }, [online]);
+
+  if (!online) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="sticky top-0 z-[60] w-full border-b border-amber-500/30 bg-amber-500/15 px-4 py-2 text-center text-xs font-bold text-amber-800 dark:text-amber-200 backdrop-blur-sm"
+      >
+        You&apos;re offline — some actions are paused. We&apos;ll reconnect automatically.
+      </div>
+    );
+  }
+
+  if (showBackOnline) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="sticky top-0 z-[60] w-full border-b border-green-500/30 bg-green-500/15 px-4 py-2 text-center text-xs font-bold text-green-800 dark:text-green-200 backdrop-blur-sm animate-in fade-in"
+      >
+        Back online
+      </div>
+    );
+  }
+
+  return null;
 }
 
 /**
@@ -99,25 +170,29 @@ export default function App() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SCHEMA_WEBSITE }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SCHEMA_APP }} />
       <div className="bg-background text-foreground min-h-screen pb-16 sm:pb-0">
-        {isAdminDashboard ? (
-          <Outlet />
-        ) : isAuthPage ? (
-          <Outlet />
-        ) : (
-          <>
-            {shouldDisplayAppNavBar && (
-              <NavBar navigationItems={navigationItems} />
-            )}
-            <div className="mx-auto max-w-(--breakpoint-2xl)">
-              <Outlet />
-            </div>
-            <Footer footerNavigation={footerNavigation} />
-          </>
-        )}
+        <ConnectionBanner />
+        <ErrorBoundary resetKey={location.pathname}>
+          {isAdminDashboard ? (
+            <Outlet />
+          ) : isAuthPage ? (
+            <Outlet />
+          ) : (
+            <>
+              {shouldDisplayAppNavBar && (
+                <NavBar navigationItems={navigationItems} />
+              )}
+              <div className="mx-auto max-w-(--breakpoint-2xl)">
+                <Outlet />
+              </div>
+              <Footer footerNavigation={footerNavigation} />
+            </>
+          )}
+        </ErrorBoundary>
       </div>
       <Toaster position="bottom-right" />
       <CookieConsentBanner />
       {!isAdminDashboard && !isAuthPage && <WhatsAppButton />}
+      {!isAdminDashboard && !isAuthPage && <ScrollToTopButton />}
     </>
   );
 }

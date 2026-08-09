@@ -1,2 +1,12 @@
 node_modules/
 .wasp/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+!.env.*.example
+.env.server
+.env.client
+STOCKMART_CREDENTIALS.txt
+

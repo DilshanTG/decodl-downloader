@@ -10,9 +10,12 @@ import {
 import { DOWNLOAD_STATUS_COLORS, DOWNLOAD_STATUS_LABELS } from "../../../shared/constants";
 import { useToast } from "../../../client/hooks/use-toast";
 
-function getDownloadUrl(id: string) {
-  const base = (import.meta as any).env?.REACT_APP_API_URL || window.location.origin.replace(":3000", ":3001");
-  return `${base.replace(/\/$/, "")}/api/download-file/${id}`;
+/** Same masked delivery path as HistoryPage / DetailPage (dl.stockmart.lk → CF Worker). */
+function getDownloadUrl(downloadId: string, downloadToken?: string | null) {
+  const base = `https://dl.stockmart.lk/file/${downloadId}`;
+  return downloadToken
+    ? `${base}?token=${encodeURIComponent(downloadToken)}`
+    : base;
 }
 
 export default function AdminDownloadsPage({ user }: { user: AuthUser }) {
@@ -148,9 +151,15 @@ export default function AdminDownloadsPage({ user }: { user: AuthUser }) {
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex gap-2">
-                          {d.status === "completed" && d.downloadUrl && (
+                          {d.status === "completed" && d.downloadUrl && d.downloadToken && (
                             <Button size="sm" variant="default" asChild className="h-7 rounded-lg text-[10px] font-bold px-2.5">
-                              <a href={getDownloadUrl(d.id)} target="_blank" rel="noopener noreferrer">Download</a>
+                              <a
+                                href={getDownloadUrl(d.id, d.downloadToken)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Download
+                              </a>
                             </Button>
                           )}
                           {d.status === "failed" && (
