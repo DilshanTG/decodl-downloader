@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import crypto from 'crypto'
+import { filenameFromUrl } from '../decodl/client'
 
 const TRUSTED_DECODL_HOSTS = new Set(['decodl.net', 'decodl.ir', 'decodlbot.ir'])
 
@@ -54,7 +55,11 @@ export const downloadFile = async (req: Request, res: Response, context: any) =>
   // Build branded filename
   const slug = (download.providerSlug as string) || 'stockmart'
   const isVideo = slug.includes('_video')
-  const base = sanitize(download.fileName || `stockmart-${slug}-${id.slice(0, 8)}`)
+  // fileName is null on every record predating the URL-path recovery below, so
+  // fall back to the download link itself rather than to a bare .jpg default.
+  const base = sanitize(
+    download.fileName || filenameFromUrl(download.downloadUrl) || `stockmart-${slug}-${id.slice(0, 8)}`
+  )
 
   // Prefer the real extension carried by the upstream filename (.zip, .rar, …) so
   // archives are not mislabelled as .jpg. A trailing token only counts as an

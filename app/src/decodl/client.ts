@@ -13,6 +13,35 @@ const DEFAULT_TIMEOUT_MS = 15_000
 /** Known Decodl numeric error codes: 4xxxxx / 5xxxxx (e.g. 400015, 404024). */
 const KNOWN_ERROR_CODE_RE = /^[45]\d{5}$/
 
+/**
+ * A trailing token counts as an extension only when it is short and contains a
+ * letter — so a version suffix ("asset v2.1") is not mistaken for one, while
+ * digit-leading extensions like ".7z" still qualify.
+ */
+const EXT_RE = /\.[a-z0-9]{1,5}$/i
+
+/**
+ * Recover the real filename from a Decodl download link.
+ *
+ * Decodl's completion payload carries no filename field at all (verified against
+ * the live API: it returns only downloadLink / progress / balance), and the file
+ * server labels every asset `application/octet-stream`. The last path segment is
+ * therefore the only trustworthy source of the true extension:
+ *   …/download/lorempicsum-1080319026.jpg?cipher=…  →  lorempicsum-1080319026.jpg
+ */
+export function filenameFromUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop()
+    if (!last) return undefined
+    const decoded = decodeURIComponent(last)
+    const ext = decoded.match(EXT_RE)?.[0]
+    return ext && /[a-z]/i.test(ext) ? decoded : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function getHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -340,7 +369,8 @@ export async function checkDecodlJobStatus(jobId: string): Promise<DecodlStatusR
     return {
       status: 'completed',
       downloadUrl,
-      fileName: data.fileName || data.file_name || data.name,
+      // Decodl sends none of these keys today; the URL path is the real source.
+      fileName: data.fileName || data.file_name || data.name || filenameFromUrl(downloadUrl),
       fileSize: data.fileSize || data.file_size || data.size,
       thumbnailUrl: data.thumbnailUrl || data.thumbnail || data.preview,
     }
