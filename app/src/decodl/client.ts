@@ -59,8 +59,21 @@ function filterOptions(options?: Array<{ name: string; value: string }>) {
   return filtered.length > 0 ? filtered : undefined
 }
 
+/**
+ * Flag an error as safe for PgBoss retry.
+ *
+ * The error is copied into a plain Error rather than mutated in place: a fetch
+ * timeout rejects with a DOMException whose `code` is a getter-only accessor,
+ * so `Object.assign(err, { code })` threw a TypeError in strict mode. That
+ * replaced the real timeout with a confusing crash and — because the throw
+ * happened before `transient` could be read back — meant no timeout was ever
+ * classified as retryable.
+ */
 function markTransient(err: Error, extra?: Record<string, unknown>): Error {
-  return Object.assign(err, { transient: true as const, ...extra })
+  const copy = new Error(err?.message || 'Network error', err ? { cause: err } : undefined)
+  if (err?.name) copy.name = err.name
+  if (err?.stack) copy.stack = err.stack
+  return Object.assign(copy, { transient: true as const, ...extra })
 }
 
 /**
